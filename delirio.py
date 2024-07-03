@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import  QMessageBox, QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QListWidget, QListWidgetItem, QSizePolicy, QHBoxLayout, QProgressBar
 from PyQt6.QtCore import  Qt, pyqtSignal, pyqtSlot, QSize, QTimer
+from PyQt6.QtGui import QFont 
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow.data_filter import DataFilter
 import sys
@@ -333,17 +334,116 @@ class PopupWindow(QWidget):
         self.show()
 
 class PatientDataWindow(QWidget):
-    def __init__(self, patient_id):
+    def __init__(self,patient_id):
         super().__init__()
-        self.setWindowTitle(f"NeuroBack - Data Controls for {patient_id}")
+
+        self.plot_w = pg.PlotWidget()
+        self.plot_w.setBackground((18, 60, 790))
+        layout=QVBoxLayout()
+
+        connection = sqlite3.connect("patient_data.db")
+        cursor = connection.cursor()
+        cursor.execute(f"SELECT * FROM patients WHERE id_patient=?", (patient_id,))
+        datos = cursor.fetchone()
+        nombre = datos[1]
+        print(nombre)
+        cursor.execute(f"SELECT * FROM {nombre}")
+        row = []
+        self.Title = QLabel()
+        font = QFont()
+
+        # Establecer el tamaño del texto (puedes ajustar el tamaño según tus necesidades)
+        font.setPointSize(16)
+
+        # Aplicar la fuente al QLabel
+        self.Title.setFont(font)
+        def plotear_pot(n_session,name):
+
+            ruta=f"EV-EEG{name}{n_session}.csv"
+        
+            tDuracion=20
+            self.dt=12.5/1000
+            self.period=10
+            self.n_dt=11
+            #self.n_dt=2
+            fs=250
+            fases=[self.dt*i for i in range(self.n_dt)]
+            POTENCIAS=[]
+            for i in range(self.n_dt):
+                lab= open(ruta)
+                datos = np.loadtxt(lab, delimiter="\t")
+                datos=np.transpose(datos)
+                startPosition=i*int(tDuracion*fs)
+                endPosition=(i+1)*int(tDuracion*fs)-1
+                canal=7
+                x=datos[canal][startPosition:endPosition]
+                # Estimate PSD `S_xx_welch` at discrete frequencies `f_welch`
+                f_welch, S_xx_welch = signal.welch(x, fs=fs)
+                # Integrate PSD over spectral bandwidth
+                df_welch = f_welch[1] - f_welch[0]
+
+                indices_intervalo = np.where((f_welch >= 8) & (f_welch <= 12))[0]
+                # Seleccionar las frecuencias y la PSD dentro del intervalo deseado
+                S_xx_intervalo = S_xx_welch[indices_intervalo]
+                
+                POTENCIAS.append(np.sum(S_xx_intervalo) * df_welch)
+            print('POTENCIAS')
+            print(POTENCIAS)
+            potencias=np.array(POTENCIAS)
+            potencias/=np.max(potencias)
+            print('FASES')
+            print(fases)
+            print('----------')
+            self.plot_w.clear()
+            self.pen = pg.mkPen(color=(106, 255, 164))
+            self.data_line = self.plot_w.plot(fases, potencias, pen=self.pen)
+            self.plot_w.setLabel('left', 'Potencia')
+            self.plot_w.setLabel('bottom', 'Fase[ms]')
+        def on_button_click(n_session,name):
+            plotear_pot(n_session,name)
+            PAF=self.PAFs[n_session-1]
+            item_text = f"Session number: {n_session}, PAF: {PAF:.2f}"
+            self.Title.setText(item_text)
+            print(PAF)
+        filas=cursor.fetchall()
+        self.PAFs=[]
+        if filas:
+            for row in filas:
+                nses = row[0]
+                PAF = row[1]
+                print(PAF)
+                self.PAFs.append(PAF)                
+                if nombre and nses:
+                    button_text = "See Data from session {}".format(nses)
+                    btn_see_power = QPushButton(button_text)
+                    layout.addWidget(btn_see_power)
+                    btn_see_power.clicked.connect(lambda _, button_number=nses: on_button_click(button_number,nombre))
+                    print('nses')
+                    print(nses)
+                    print('nombre')
+                    print(nombre)
+            layout.addWidget(self.Title)
+            layout.addWidget(self.plot_w)  # Add plot_widget to layout
+        else:
+            layout.addWidget(self.Title)
+            item_text='ERROR: NO SESSIONS FOUND'
+            self.Title.setText(item_text)
+            
+
+                
+        cursor.close()
+        connection.close()
+
+        self.setLayout(layout)  # Set layout after adding plot_widget
+
+        self.setWindowTitle(f"NeuroBack - Data Controls for {nombre}")
         self.setGeometry(200, 200, 600, 400)
         self.setStyleSheet("background-color: #1E3B4D; color: white;")
 
-        self.plot_power = pg.PlotWidget()
-        # self.plot_widget.setBackground((18,60,790))
+    
 
-        h_layout = QHBoxLayout()    
-        h_layout.addWidget(self.plot_power)
+
+        
 
 
 class SessionWindow(QWidget):
@@ -376,6 +476,7 @@ class SessionWindow(QWidget):
 
         self.nombre_CAL=f"CAL-EEG{name}{n_session}.csv"
         self.nombre_EV=f"EV-EEG{name}{n_session}.csv"
+        self.nombre_EST=f"EST-EEG{name}{n_session}.csv"
 
 
         self.value=0
@@ -425,14 +526,15 @@ class SessionWindow(QWidget):
         btn_start_evaluation = QPushButton("Start Evaluation", self)
         btn_stop_session = QPushButton("Stop Session", self)
         btn_calc_PAF= QPushButton("Calculate PAF", self)
-        btn_conectar=QPushButton("Connect Cyton", self)
+        btn_start_stimulation= QPushButton("Start Stimulation", self)
+        
 
         # Connect buttons to slots
         btn_start_recording.clicked.connect(self.start)
         btn_start_evaluation.clicked.connect(self.evaluation)
         btn_stop_session.clicked.connect(self.stop)
         btn_calc_PAF.clicked.connect(self.calc_PAF)
-        btn_conectar.clicked.connect(self.connect_cyton)
+        btn_start_stimulation.clicked.connect(self.stimulation)
 
         # Create a QLabel to display the PAF value
         self.paf_label = QLabel("PAF: ", self)
@@ -440,12 +542,14 @@ class SessionWindow(QWidget):
         # Add the PAF label to the vertical layout
         v_layout.addWidget(self.paf_label)
 
-        v_layout.addWidget(btn_conectar)
+        
         v_layout.addWidget(btn_start_recording)
-        v_layout.addWidget(btn_start_evaluation)
         #layout.addWidget(btn_start_session)
-        v_layout.addWidget(btn_stop_session)
         v_layout.addWidget(btn_calc_PAF)
+        v_layout.addWidget(btn_start_evaluation)
+        v_layout.addWidget(btn_start_stimulation)
+        v_layout.addWidget(btn_stop_session)
+        
         
 
         # Open the WAV file
@@ -475,47 +579,34 @@ class SessionWindow(QWidget):
         # Update the progress bar
         self.progress_bar.update()
 
-    def evaluation(self):
-        PuertoArduino='/dev/cu.usbmodem101'
-        PuertoPlaca='/dev/cu.usbserial-DM03H6KD'
-        Placa='Sintetica'
-        ruta=self.nombre_EV
-        canal=7
-        fs = 250
-        if self.PAF is not None:
-            fr=self.PAF
-        else:
-            fr=10
-        tGuardado=10
-        tDuracion=20
-        POTENCIAS=[]
-        dt=12.5/1000
-        self.period=10
-        for i in range(11):
-            delay_time=i*dt
-            start=i*int(tDuracion*fs)
-            end=(i+1)*int(tDuracion*fs)-1
-            Pi=Estim(PuertoArduino,Placa,PuertoPlaca,ruta,canal,fs,fr,tDuracion,tGuardado,dt,startPosition=start,endPosition=end,PLOT=False)
-            POTENCIAS.append(Pi)
-        self.period_label.setText("Evaluation: ER-NF")
-        self.start_part1(210*1000)
-
-    def PasaBanda(Fr,Fs=250,plotear=False):
+    def PasaBanda(self,Fr,Fs=250,plotear=False):
         b, a = signal.iirfilter(2, [(Fr-1),(Fr+1)], btype='band', analog=False, ftype='butter',fs=Fs)
         return b, a
 
 
-    def led_toggle_ON(puerto_serie,delay_time):
+    def led_toggle_ON(self,puerto_serie,delay_time):
         # Adjust the delay time as needed (in seconds)
         time.sleep(delay_time)
         puerto_serie.write('p'.encode())
 
-    def led_toggle_OFF(puerto_serie,delay_time):
+    def led_toggle_OFF(self,puerto_serie,delay_time):
         time.sleep(delay_time)
         puerto_serie.write('a'.encode())
 
 
-    def P_Welch(ruta,canal,Fs,startPosition=0,endPosition=-1):
+    def P_Welch(self,ruta,canal,Fs,startPosition=0,endPosition=-1):
+        with open(ruta, "r") as archivo_entrada:
+        # Lee el contenido del archivo
+            contenido = archivo_entrada.read()
+
+        # Reemplaza todas las comas por puntos
+            contenido_modificado = contenido.replace(",", ".")
+
+        # Abre el archivo CSV para escritura
+        with open(ruta, "w") as archivo_salida:
+            # Escribe el contenido modificado en el nuevo archivo
+            archivo_salida.write(contenido_modificado)
+        
         lab= open(ruta)
         datos = np.loadtxt(lab, delimiter="\t")
         datos=np.transpose(datos)
@@ -530,7 +621,7 @@ class SessionWindow(QWidget):
         S_xx_intervalo = S_xx_welch[indices_intervalo]
         return  np.sum(S_xx_intervalo) * df_welch #AlfaPower
         
-    def Estim(PuertoArduino,Placa,PuertoPlaca,ruta,canal,fs,fr,tDuracion,tGuardado,delay_time,PLOT=False,startPosition=0,endPosition=-1):
+    def Estim(self,PuertoArduino,Placa,PuertoPlaca,ruta,canal,fs,fr,tDuracion,tGuardado,delay_time,PLOT=False,startPosition=0,endPosition=-1):
         puerto_serie = serial.Serial(PuertoArduino, 2000000)
         BoardShim.enable_dev_board_logger()
         params = BrainFlowInputParams()
@@ -544,7 +635,7 @@ class SessionWindow(QWidget):
         board.start_stream ()
         y=[0,0,0,0,0]
         x=[0,0,0,0,0]
-        b,a=PasaBanda(fr,fs)
+        b,a=self.PasaBanda(fr,fs)
         cruces=[]
         error=0
         i=0
@@ -563,9 +654,9 @@ class SessionWindow(QWidget):
                 yn=b[0]*x[-1]+b[1]*x[-2]+b[2]*x[-3]+b[3]*x[-4]+b[4]*x[-5]-a[1]*y[-1]-a[2]*y[-2]-a[3]*y[-3]-a[4]*y[-4]
                 if yn>0 and y[-1]<0: # revisar esta condicion
                     cruces.append(len(y)/fs)
-                    threading.Thread(target=led_toggle_ON, args=(puerto_serie, delay_time)).start()
+                    threading.Thread(target=self.led_toggle_ON, args=(puerto_serie, delay_time)).start()
                 elif yn<0 and y[-1]>0: # revisar esta condicion
-                    threading.Thread(target=led_toggle_OFF, args=(puerto_serie, delay_time)).start()
+                    threading.Thread(target=self.led_toggle_OFF, args=(puerto_serie, delay_time)).start()
                 y.append(yn)
                 if not PLOT:
                     x=x[1:]
@@ -574,23 +665,87 @@ class SessionWindow(QWidget):
                 DataFilter.write_file(DATA, ruta, 'a')
                 np.delete(DATA, np.s_[:], axis=1)
 
-        DataFilter.write_file(DATA, 'ruta', 'a')
+        DataFilter.write_file(DATA, ruta, 'a')
         np.delete(DATA, np.s_[:], axis=1)
         board.stop_stream()
         board.release_session()
-        Palfa=P_Welch(ruta,canal,fs,startPosition,endPosition)
+        Palfa=self.P_Welch(ruta,canal,fs,startPosition,endPosition)
         return Palfa
-    def start_part1(self,largo):
-        self.T1 =QTimer()
-        self.T1.setInterval(largo)
-        self.T1.start()
-        self.T1.timeout.connect(self.end_part1)
-
-    def conectar_protocolo(self):
     
-    def end_part1(self):
-        self.T1.stop()
-        self.end_evaluation(1000)
+
+
+    def evaluation(self):
+        PuertoArduino='/dev/cu.usbmodem101'
+        PuertoPlaca='/dev/cu.usbserial-DM03H6KD'
+        Placa='CYTON'
+        ruta=self.nombre_EV
+        canal=7
+        fs = 250
+        if self.PAF is not None:
+            fr=self.PAF
+        else:
+            fr=10
+        tGuardado=10
+        tDuracion=20
+        POTENCIAS=[]
+        self.dt=12.5/1000
+        self.period=10
+        self.n_dt=11
+        #self.n_dt=2
+        for i in range(self.n_dt):
+            print(i)
+            delay_time=i*self.dt
+            start=i*int(tDuracion*fs)
+            end=(i+1)*int(tDuracion*fs)-1
+            Pi=self.Estim(PuertoArduino,Placa,PuertoPlaca,ruta,canal,fs,fr,tDuracion,tGuardado,delay_time,startPosition=start,endPosition=end,PLOT=False)
+            POTENCIAS.append(Pi)
+        self.delaymax=np.argmax(POTENCIAS)
+        print(str(self.delaymax*12.5)+'ms')
+        print(POTENCIAS)
+        self.period_label.setText("Evaluation: ER-NF")
+        #self.start_part1(210*1000)
+        self.end_evaluation()
+
+
+
+
+
+
+
+    def stimulation(self):
+        PuertoArduino='/dev/cu.usbmodem101'
+        PuertoPlaca='/dev/cu.usbserial-DM03H6KD'
+        Placa='CYTON'
+        ruta=self.nombre_EST
+        canal=7
+        fs = 250
+        if self.PAF is not None:
+            fr=self.PAF
+        else:
+            fr=10
+        tGuardado=10
+        tDuracion=60
+        self.period=10
+        delay_time=self.delaymax
+        Pi=self.Estim(PuertoArduino,Placa,PuertoPlaca,ruta,canal,fs,fr,tDuracion,tGuardado,delay_time)
+
+
+    
+
+
+    
+
+
+    #def start_part1(self,largo):
+    #    self.T1 =QTimer()
+    #    self.T1.setInterval(largo)
+    #    self.T1.start()
+    #    self.T1.timeout.connect(self.end_part1)
+
+
+    #def end_part1(self): #QUE ONDA CON ESTE TIMER
+    #    self.T1.stop()
+    #    self.end_evaluation()
     
     def end_evaluation(self):
         self.period_label.setText("Evaluation finished")
@@ -601,22 +756,61 @@ class SessionWindow(QWidget):
             (self.PAF, self.nombre_CAL, self.nombre_EV))
 
         connection.commit()
-        connection.close()       
+        connection.close()            
 
 
 
-    @pyqtSlot()
-    def connect_cyton(self):
+    def start_REST1(self, largo):
+        self.period_label.setText("First period: EYES OPENED RESTING")
+        self.tREST1 =QTimer()
+        self.tREST1.setInterval(largo)
+        self.timer1 = QTimer()
+        self.timer1.setInterval(largo//100)
+        self.timer1.timeout.connect(self.update_progress)
+        self.timer1.start()
+        self.tREST1.start()
+        self.tREST1.timeout.connect(self.end_REST1)
+
+    def end_REST1(self):
+
+        self.reset_progress_bar()
+        self.timer1.stop()
+        self.tREST1.stop()
+        #self.start_REST2(1000)
+        self.start_REST2(30000)
+
+    def start_REST2(self,largo):
+        self.period=2
+        self.period_label.setText("Second period: EYES SHUT RESTING")
+        self.tREST2 =QTimer()
+        self.tREST2.setInterval(largo)
+        self.timer2 = QTimer()
+        self.timer2.setInterval(largo//100)
+        self.timer2.timeout.connect(self.update_progress)
+        self.timer2.start()
+        self.tREST2.start()
+        self.tREST2.timeout.connect(self.end_REST2)  
+
+    
+    def end_REST2(self):
+        self.period_label.setText("Calibration finished")
+        self.reset_progress_bar()
+        self.timer2.stop()
+        self.tREST2.stop()
+        self.stop()
+
+
+    def start(self):
         # SE ESTABLECE COMUNICACIÓN CON CYTHON
         # BoardShim.enable_board_logger()
         BoardShim.enable_dev_board_logger()
         params = BrainFlowInputParams()
-        params.serial_port = '/dev/ttyUSB0'
+        params.serial_port = '/dev/cu.usbserial-DM03H6KD'
         # params.serial_port = 'COM12'
         # params.timeout = 0
         # params.file = ''
-        board_id = BoardIds.SYNTHETIC_BOARD.value
-        #board_id = BoardIds.CYTON_BOARD.value
+        #board_id = BoardIds.SYNTHETIC_BOARD.value
+        board_id = BoardIds.CYTON_BOARD.value
         self.board = BoardShim(board_id, params)
         self.board.prepare_session()
 
@@ -629,158 +823,9 @@ class SessionWindow(QWidget):
         # self.board.config_board('x7160100X')
         # self.board.config_board('x8160100X')
 
-
-    def start_VEP1(self, largo):
-        self.period_label.setText("First period: VEP")
-        self.tVEP1 =QTimer()
-        self.tVEP1.setInterval(largo)
-        self.timer1 = QTimer()
-        self.timer1.setInterval(largo//100)
-        self.timer1.timeout.connect(self.update_progress)
-        self.timer1.start()
-        self.tVEP1.start()
-        self.tVEP1.timeout.connect(self.end_VEP1)
-
-    def end_VEP1(self):
-
-        self.reset_progress_bar()
-        self.timer1.stop()
-        self.tVEP1.stop()
-        self.start_rest1(1000)
-
-    def start_rest1(self,largo):
-        self.period=2
-        self.period_label.setText("2nd period: RESTING")
-        self.tREST1 =QTimer()
-        self.tREST1.setInterval(largo)
-        self.timer2 = QTimer()
-        self.timer2.setInterval(largo//100)
-        self.timer2.timeout.connect(self.update_progress)
-        self.timer2.start()
-        self.tREST1.start()
-        self.tREST1.timeout.connect(self.end_rest1)
-
-    def end_rest1(self):
-        self.reset_progress_bar()
-        self.timer2.stop()
-        self.tREST1.stop()
-        self.start_VEP2(1000)
-
-    def start_VEP2(self, largo):
-        self.period=3
-        self.period_label.setText("3rd period: VEP")
-        self.tVEP2 =QTimer()
-        self.tVEP2.setInterval(largo)
-        self.timer3 = QTimer()
-        self.timer3.setInterval(largo//100)
-        self.timer3.timeout.connect(self.update_progress)
-        self.timer3.start()
-        self.tVEP2.start()
-        self.tVEP2.timeout.connect(self.end_VEP2)
-
-    def end_VEP2(self):
-        self.reset_progress_bar()
-        self.timer3.stop()
-        self.tVEP2.stop()
-        self.start_rest2(1000)
-
-    def start_rest2(self, largo):
-        self.period=4
-        self.period_label.setText("4th period: RESTING")
-        self.tREST2 =QTimer()
-        self.tREST2.setInterval(largo)
-        self.timer4 = QTimer()
-        self.timer4.setInterval(largo//100)
-        self.timer4.timeout.connect(self.update_progress)
-        self.timer4.start()
-        self.tREST2.start()
-        self.tREST2.timeout.connect(self.end_rest2)
-
-    def end_rest2(self):
-        self.reset_progress_bar()
-        self.timer4.stop()
-        self.tREST2.stop()
-        self.start_VEP3(1000)
-
-    def start_VEP3(self, largo):
-        self.period=5
-        self.period_label.setText("5th period: VEP")
-        self.tVEP3 =QTimer()
-        self.tVEP3.setInterval(largo)
-        self.timer5 = QTimer()
-        self.timer5.setInterval(largo//100)
-        self.timer5.start()
-        self.tVEP3.start()
-        self.timer5.timeout.connect(self.update_progress)
-        self.tVEP3.timeout.connect(self.end_VEP3)
-    
-    def end_VEP3(self):
-        self.reset_progress_bar()
-        self.timer5.stop()
-        self.tVEP3.stop()
-        self.start_rest3(1000)
-    
-    def start_rest3(self, largo):
-        self.period=6
-        self.period_label.setText("6th period: RESTING")
-        self.tREST3 =QTimer()
-        self.tREST3.setInterval(largo)
-        self.timer6 = QTimer()
-        self.timer6.setInterval(largo//100)
-        self.timer6.timeout.connect(self.update_progress)
-        self.timer6.start()
-        self.tREST3.start()
-        self.tREST3.timeout.connect(self.end_rest3)    
-
-    def end_rest3(self):
-        self.reset_progress_bar()
-        self.timer6.stop()
-        self.tREST3.stop()
-        self.start_VEP4(1000)
-
-    def start_VEP4(self, largo):
-        self.period=7
-        self.period_label.setText("7th period: VEP")
-        self.tVEP4 =QTimer()
-        self.tVEP4.setInterval(largo)
-        self.timer7 = QTimer()
-        self.timer7.setInterval(largo//100)
-        self.timer7.timeout.connect(self.update_progress)
-        self.timer7.start()
-        self.tVEP4.start()
-        self.tVEP4.timeout.connect(self.end_VEP4)
-    
-    def end_VEP4(self):
-        self.reset_progress_bar()
-        self.timer7.stop()
-        self.tVEP4.stop()
-        self.start_rest4(1000)
-    
-    def start_rest4(self, largo):
-        self.period=8
-        self.period_label.setText("Last period: RESTING")
-        self.tREST4 =QTimer()
-        self.tREST4.setInterval(largo)
-        self.timer8 = QTimer()
-        self.timer8.setInterval(largo//100)
-        self.timer8.timeout.connect(self.update_progress)
-        self.timer8.start()
-        self.tREST4.start()
-        self.tREST4.timeout.connect(self.end_rest4)    
-
-    def end_rest4(self):
-        self.period_label.setText("Calibration finished")
-        self.reset_progress_bar()
-        self.timer8.stop()
-        self.tREST4.stop()
-        self.stop()
-
-
-    def start(self):
-        self.board.start_stream(900000)  # arranca la cyton
+        self.board.start_stream(2000000)  # arranca la cyton
         print("START")
         time.sleep(2)
-
         self.x = [0]  
         self.y = [0]  
         self.pen = pg.mkPen(color=(106, 255, 164))
@@ -790,7 +835,8 @@ class SessionWindow(QWidget):
         self.timer.setInterval(50)
         self.timer.timeout.connect(self.update_plot_data)
         self.timer.start()
-        self.start_VEP1(1000)
+        #self.start_REST1(1000)
+        self.start_REST1(30000)
 
     def stop(self):
         self.board.stop_stream()
@@ -799,37 +845,23 @@ class SessionWindow(QWidget):
             DataFilter.write_file(data, self.nombre_CAL, 'a')  # use 'a' for append mode
         else:
             DataFilter.write_file(data, self.nombre_EV, 'a')  # use 'a' for append mode
-        self.timer.stop()
+        
         self.plot_widget.clear()
-        print("STOP")
+        
         match self.period:
             case 1:
+                self.timer.stop()
                 self.timer1.stop()
-                self.tVEP1.stop()
-            case 2:
-                self.timer2.stop()
                 self.tREST1.stop()
-            case 3:
-                self.timer3.stop()
-                self.tVEP2.stop()
-            case 4:
-                self.timer4.stop()
+            case 2:
+                self.timer.stop()
+                self.timer2.stop()
                 self.tREST2.stop()
-            case 5:
-                self.timer5.stop()
-                self.tVEP3.stop()
-            case 6:
-                self.timer6.stop()
-                self.tREST3.stop()
-            case 7:
-                self.timer7.stop()
-                self.tVEP4.stop()
-            case 8:
-                self.timer8.stop()   
-                self.tREST4.stop()
             case 10:
                 self.T1.stop()
-        self.progress_bar.reset() 
+        self.progress_bar.reset()
+        print("STOP")
+        self.board.release_session()
 
     
     def update_plot_data(self):
@@ -850,11 +882,28 @@ class SessionWindow(QWidget):
             x_plot=self.x
         self.data_line.setData(x_plot, y_plot)  # Update the data.
         if self.period<10:
-            DataFilter.write_file(newDATA,'CAL-EEG.csv', 'a')  # use 'a' for append mode
+            DataFilter.write_file(newDATA, self.nombre_CAL, 'a')  # use 'a' for append mode
         else:
-            DataFilter.write_file(newDATA,'EV-EEG.csv', 'a')  # use 'a' for append mode      
+            DataFilter.write_file(newDATA, self.nombre_EV, 'a')  # use 'a' for append mode
+                  
+
     def calc_PAF(self):
         # Cargamos los datos de las señales EEG desde un archivo
+        
+        
+
+        with open(self.nombre_CAL, "r") as archivo_entrada:
+        # Lee el contenido del archivo
+            contenido = archivo_entrada.read()
+
+        # Reemplaza todas las comas por puntos
+            contenido_modificado = contenido.replace(",", ".")
+
+        # Abre el archivo CSV para escritura
+        with open(self.nombre_CAL, "w") as archivo_salida:
+            # Escribe el contenido modificado en el nuevo archivo
+            archivo_salida.write(contenido_modificado)
+        
         lab= open(self.nombre_CAL)
         datos = np.loadtxt(lab, delimiter="\t")
         datos=np.transpose(datos)
@@ -882,6 +931,7 @@ class SessionWindow(QWidget):
         nper = int(fs * 0.75)
         f, DSP=signal.welch(s_filt, fs,  noverlap=nper//2, nperseg=nper)
         self.PAF=f[np.argmax(DSP)]
+        #self.PAF=10
         self.paf_label.setText(f"PAF: {self.PAF:.2f}")
         # Imprime la frecuencia pico
         print(f"La frecuencia pico es {self.PAF} Hz")  

@@ -3,6 +3,8 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
 import pyqtgraph as pg
 from database import save_patient_data, delete_patient_data, get_patient_data, get_patient_session
 from signal_processing import initialize_board, estim
+import time
+import numpy as np
 
 class NeurobackApp(QWidget):
     def __init__(self):
@@ -219,7 +221,8 @@ class SessionWindow(QWidget):
         self.wav_data = wav_file.read()
 
     def connect_cyton(self):
-        self.board = initialize_board('CYTON', '/dev/ttyUSB0')
+        self.board = initialize_board('SYNTHETIC', '/dev/ttyUSB0')
+        #self.board = initialize_board('CYTON', '/dev/ttyUSB0')
 
     def start(self):
         self.board.start_stream(900000)

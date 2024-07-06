@@ -677,7 +677,7 @@ class SessionWindow(QWidget):
     def evaluation(self):
         PuertoArduino='/dev/cu.usbmodem101'
         PuertoPlaca='/dev/cu.usbserial-DM03H6KD'
-        Placa='CYTON'
+        #Placa='CYTON'
         ruta=self.nombre_EV
         canal=7
         fs = 250
@@ -715,7 +715,7 @@ class SessionWindow(QWidget):
     def stimulation(self):
         PuertoArduino='/dev/cu.usbmodem101'
         PuertoPlaca='/dev/cu.usbserial-DM03H6KD'
-        Placa='CYTON'
+        #Placa='CYTON'
         ruta=self.nombre_EST
         canal=7
         fs = 250
@@ -809,8 +809,8 @@ class SessionWindow(QWidget):
         # params.serial_port = 'COM12'
         # params.timeout = 0
         # params.file = ''
-        #board_id = BoardIds.SYNTHETIC_BOARD.value
-        board_id = BoardIds.CYTON_BOARD.value
+        board_id = BoardIds.SYNTHETIC_BOARD.value
+        #board_id = BoardIds.CYTON_BOARD.value
         self.board = BoardShim(board_id, params)
         self.board.prepare_session()
 

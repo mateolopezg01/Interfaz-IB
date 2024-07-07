@@ -25,8 +25,8 @@ class Graph:
         self.win = pg.GraphicsLayoutWidget(show=True, title='BrainFlow Plot')
         self.win.resize(800, 600)
         self.win.setWindowTitle('BrainFlow Plot')
-        self.plotlist = [-1, 5, 2]
-        self.plotlist = self.exg_channels
+        self.plotlist = [1, 5, 2]
+        #self.plotlist = self.exg_channels
         self._init_timeseries()
 
         timer = QtCore.QTimer()
@@ -79,6 +79,9 @@ def phase_detection(board_shim, stop_flag,b,a,n_channel=0):
         data = board_shim.get_current_board_data(5) # cant de canales x cant de muestras ej: data.shape=(32,5) al hacer get_current_board(data)(5) con placa Synth 
         #print(data[0][0]) #al hacer esto por muestra se imprimen un monton de veces las mismas o sea que esto se revisa muchas mas veces de las que entran muestras (OK)
         if data[0][0] != anterior and len(data[0])==5:
+            if data[0][0] != anterior+1 and data[0][0]!=0:
+                print('OJO, salteó muestras')
+                print(anterior,data[0][0])
             anterior=data[0][0]
             x=data[n_channel]
             yn=b[0]*x[-1]+b[1]*x[-2]+b[2]*x[-3]+b[3]*x[-4]+b[4]*x[-5]-a[1]*y[-1]-a[2]*y[-2]-a[3]*y[-3]-a[4]*y[-4]
@@ -114,7 +117,7 @@ def main():
     board_id = BoardIds.SYNTHETIC_BOARD
     streamer_params = ''
     stop_flag = threading.Event()
-    duration = 10  # Set the duration in seconds after which the program should stop
+    duration = 100  # Set the duration in seconds after which the program should stop
     b,a= PasaBanda()
 
     try:

@@ -17,7 +17,7 @@ class Graph:
         self.exg_channels = BoardShim.get_exg_channels(self.board_id)
         self.sampling_rate = BoardShim.get_sampling_rate(self.board_id)
         self.update_speed_ms = 50
-        self.window_size = 4
+        self.window_size = 2
         self.num_points = self.window_size * self.sampling_rate
         self.stop_flag = stop_flag
 
@@ -25,7 +25,7 @@ class Graph:
         self.win = pg.GraphicsLayoutWidget(show=True, title='BrainFlow Plot')
         self.win.resize(800, 600)
         self.win.setWindowTitle('BrainFlow Plot')
-        self.plotlist = [1, 5, 2]
+        self.plotlist = [1]
         #self.plotlist = self.exg_channels
         self._init_timeseries()
 
@@ -75,23 +75,33 @@ def PasaBanda(Fr=10,Fs=250): #devuelve a y b de 5 coef c/u
 def phase_detection(board_shim, stop_flag,b,a,n_channel=0):
     anterior=-1
     y=[0,0,0,0,0]
+    x=[0,0,0,0,0]
     while not stop_flag.is_set():
         data = board_shim.get_current_board_data(5) # cant de canales x cant de muestras ej: data.shape=(32,5) al hacer get_current_board(data)(5) con placa Synth 
         #print(data[0][0]) #al hacer esto por muestra se imprimen un monton de veces las mismas o sea que esto se revisa muchas mas veces de las que entran muestras (OK)
-        if data[0][0] != anterior and len(data[0])==5:
-            if data[0][0] != anterior+1 and data[0][0]!=0:
-                print('OJO, salteó muestras')
-                print(anterior,data[0][0])
-            anterior=data[0][0]
-            x=data[n_channel]
-            yn=b[0]*x[-1]+b[1]*x[-2]+b[2]*x[-3]+b[3]*x[-4]+b[4]*x[-5]-a[1]*y[-1]-a[2]*y[-2]-a[3]*y[-3]-a[4]*y[-4]
-            y.append(yn)
-            y=y[1:]
-            if y[-1]*y[-2]<0:
-                print('LED')
-            
+        if data.size > 0:
+            if data[0][0] != anterior and len(data[0])==5:
+                if data[0][0] != anterior+1 and data[0][0]!=0:
+                    print('OJO, salteó muestras')
+                    print(anterior,data[0][0])
+                anterior=data[0][0]
+                x.append(data[n_channel][-1])
+                x=x[1:]
+                yn=b[0]*x[-1]+b[1]*x[-2]+b[2]*x[-3]+b[3]*x[-4]+b[4]*x[-5]-a[1]*y[-1]-a[2]*y[-2]-a[3]*y[-3]-a[4]*y[-4]
+                y.append(yn)
+                y=y[1:]
+                if y[-1]*y[-2]<0:
+                    print('LED')
+                
 
 
+def save(board_shim, stop_flag):
+    while not stop_flag.is_set():
+        time.sleep(5)
+        data = board_shim.get_board_data()
+        # Add your saving logic here, e.g., save to a file or database
+        print("Data saved")
+       
 
 
 
@@ -117,7 +127,7 @@ def main():
     board_id = BoardIds.SYNTHETIC_BOARD
     streamer_params = ''
     stop_flag = threading.Event()
-    duration = 100  # Set the duration in seconds after which the program should stop
+    duration = 90  # Set the duration in seconds after which the program should stop
     b,a= PasaBanda()
 
     try:
@@ -127,6 +137,10 @@ def main():
         
         phase_thread = threading.Thread(target=phase_detection, args=(board_shim, stop_flag,b,a,1))
         phase_thread.start()
+
+        save_thread = threading.Thread(target=save, args=(board_shim, stop_flag))
+        save_thread.start()
+
         
         timer_thread = threading.Thread(target=stop_program_after_interval, args=(duration, stop_flag))
         timer_thread.start()

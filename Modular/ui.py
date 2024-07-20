@@ -147,10 +147,9 @@ class PatientListWindow(QWidget):
     removePatient = pyqtSignal(int)
     getData = pyqtSignal(int)
 
-    def __init__(self):#, patient_data):
+    # Armar ventana con texto y botones
+    def __init__(self):
         super().__init__()
-        
-       
         patient_data=db.get_patient_data()
     
         self.list_widget = QListWidget()
@@ -189,23 +188,8 @@ class PatientListWindow(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.list_widget)
-    
-    def confirmar(self):
-        msg=QMessageBox()
-        msg.setWindowTitle("Confirm patient removal")
-        msg.setText("Are you sure that you want to remove this patient?")
-        msg.setStandardButtons(QMessageBox.Ok|QMessageBox.Cancel)
-        
-        x = msg.exec_()
 
-    def execute_popup_window():
-        # Create a new instance of the popup window class
-        popup_window = PopupWindow()
-
-        # Start the event loop
-        popup_window.app.exec()
-
-
+    # Volver a armar ventana
     def update_patient_list(self):
         patient_data = db.get_patient_data
         for patient in patient_data:
@@ -237,32 +221,6 @@ class PatientListWindow(QWidget):
             self.list_widget.addItem(container_item)
             self.list_widget.setItemWidget(container_item, widget)
 
-
-class PopupWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        # Set the window title
-        self.setWindowTitle("Popup Window")
-
-        # Create a layout for the window
-        layout = QVBoxLayout()
-
-        # Add a label to the layout
-        label = QLabel("Confirmation")
-        layout.addWidget(label)
-
-        # Add a button to the layout
-        button = QPushButton("Close")
-        button.clicked.connect(self.close)
-        layout.addWidget(button)
-
-        # Set the layout for the window
-        self.setLayout(layout)
-
-        # Show the window
-        self.show()
-
 class PatientDataWindow(QWidget):
     def __init__(self,patient_id):
         super().__init__()
@@ -287,6 +245,9 @@ class PatientDataWindow(QWidget):
 
         # Aplicar la fuente al QLabel
         self.Title.setFont(font)
+
+        # Función para plotear las potencias 
+        # Hace el cálculo de cada potencia y las grafica, hay que separar
         def plotear_pot(n_session,name):
 
             ruta=f"EV-EEG{name}{n_session}.csv"
@@ -295,7 +256,6 @@ class PatientDataWindow(QWidget):
             self.dt=12.5/1000
             self.period=10
             self.n_dt=11
-            #self.n_dt=2
             fs=250
             fases=[self.dt*i for i in range(self.n_dt)]
             POTENCIAS=[]
@@ -329,12 +289,16 @@ class PatientDataWindow(QWidget):
             self.data_line = self.plot_w.plot(fases, potencias, pen=self.pen)
             self.plot_w.setLabel('left', 'Potencia')
             self.plot_w.setLabel('bottom', 'Fase[ms]')
+        
+        # Muestra la PAF del numero de sesión y plotea
         def on_button_click(n_session,name):
             plotear_pot(n_session,name)
             PAF=self.PAFs[n_session-1]
             item_text = f"Session number: {n_session}, PAF: {PAF:.2f}"
             self.Title.setText(item_text)
             print(PAF)
+        
+        # Abre la base de datos y muestra las sesiones
         filas=cursor.fetchall()
         self.PAFs=[]
         if filas:
@@ -373,10 +337,8 @@ class PatientDataWindow(QWidget):
     
 
 
-        
-
-
 class SessionWindow(QWidget):
+
     def __init__(self, patient_id):
         super().__init__()
         connection = sqlite3.connect("patient_data.db")
@@ -817,54 +779,39 @@ class SessionWindow(QWidget):
             DataFilter.write_file(newDATA, self.nombre_EV, 'a')  # use 'a' for append mode
                   
 
-    def calc_PAF(self):
-        # Cargamos los datos de las señales EEG desde un archivo
-        
-        
+        def calc_PAF(self):
+            # Cargamos los datos de las señales EEG desde un archivo
+            with open(self.nombre_CAL, "r") as archivo_entrada:
+            # Lee el contenido del archivo
+                contenido = archivo_entrada.read()
 
-        with open(self.nombre_CAL, "r") as archivo_entrada:
-        # Lee el contenido del archivo
-            contenido = archivo_entrada.read()
+            # Reemplaza todas las comas por puntos
+                contenido_modificado = contenido.replace(",", ".")
 
-        # Reemplaza todas las comas por puntos
-            contenido_modificado = contenido.replace(",", ".")
-
-        # Abre el archivo CSV para escritura
-        with open(self.nombre_CAL, "w") as archivo_salida:
-            # Escribe el contenido modificado en el nuevo archivo
-            archivo_salida.write(contenido_modificado)
-        
-        lab= open(self.nombre_CAL)
-        datos = np.loadtxt(lab, delimiter="\t")
-        datos=np.transpose(datos)
-        datos=datos[1:] #Eliminamos la primer columna
-        muestras=datos.shape[1]
-        t = np.linspace(0,muestras/250, muestras)
-        i=0
-        eeg=np.zeros([3, muestras])
-        for c in [5,6,7]:
-            eeg[i]=datos[c]
-            i+=1
-        eog=np.zeros([2, muestras])
-        i=0
-        for c in [1,2]:
-            eog[i]=datos[c]
-            i+=1
-
-        fs=250
-        rest=eeg[0]
-        
-        # Filtra la señal en la banda de 8 a 12 Hz
-        sos = signal.butter(2**5, [8, 12], 'band', analog=False, fs=250, output='sos')
-        s_filt = signal.sosfiltfilt(sos, rest)
-        # Calcula la frecuencia pico
-        nper = int(fs * 0.75)
-        f, DSP=signal.welch(s_filt, fs,  noverlap=nper//2, nperseg=nper)
-        self.PAF=f[np.argmax(DSP)]
-        #self.PAF=10
-        self.paf_label.setText(f"PAF: {self.PAF:.2f}")
-        # Imprime la frecuencia pico
-        print(f"La frecuencia pico es {self.PAF} Hz")  
+            # Abre el archivo CSV para escritura
+            with open(self.nombre_CAL, "w") as archivo_salida:
+                # Escribe el contenido modificado en el nuevo archivo
+                archivo_salida.write(contenido_modificado)
+            
+            lab= open(self.nombre_CAL)
+            datos = np.loadtxt(lab, delimiter="\t")
+            datos=np.transpose(datos)
+            datos=datos[5:] #Eliminamos la primer columna
+            muestras=datos.shape[1]
+            rest=datos[5]
+            t = np.linspace(0,muestras/250, muestras)
+            fs=250
+            
+            # Filtra la señal en la banda de 8 a 12 Hz
+            sos = signal.butter(2**5, [8, 12], 'band', analog=False, fs=250, output='sos')
+            s_filt = signal.sosfiltfilt(sos, rest)
+            # Calcula la frecuencia pico
+            nper = int(fs * 0.75)
+            f, DSP=signal.welch(s_filt, fs,  noverlap=nper//2, nperseg=nper)
+            self.PAF=f[np.argmax(DSP)]
+            self.paf_label.setText(f"PAF: {self.PAF:.2f}")
+            # Imprime la frecuencia pico
+            print(f"La frecuencia pico es {self.PAF} Hz")  
 
 
 

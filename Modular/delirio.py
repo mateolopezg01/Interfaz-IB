@@ -13,7 +13,7 @@ import pyaudio
 import time
 import serial
 import threading
-
+import database as db
 
 class NeurobackApp(QWidget):
     def __init__(self): 
@@ -77,31 +77,7 @@ class NeurobackApp(QWidget):
         treatment = self.entry_treatment.text()
         sessions = self.entry_sessions.text()
 
-        # Save data to database
-        connection = sqlite3.connect("patient_data.db")
-        cursor = connection.cursor()
-
-        # Create table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS patients (
-                id_patient INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                age INTEGER,
-                treatment TEXT,
-                sessions INTEGER
-            )
-        """)
-
-        cursor.execute("INSERT INTO patients (name, age, treatment, sessions) VALUES (?, ?, ?, ?)",
-            (name, age, treatment, sessions))
-
-
-        cursor.execute(f"CREATE TABLE IF NOT EXISTS {name}(session_num INTEGER PRIMARY KEY AUTOINCREMENT,PAF FLOAT,cal_route TEXT,ev_route TEXT)")
-        # Commit changes
-        connection.commit()
-
-        # Close connection
-        connection.close()
+        db.save_patient_data(name,age,treatment,sessions)
 
         # Clear the input fields
         self.entry_name.clear()
@@ -109,13 +85,9 @@ class NeurobackApp(QWidget):
         self.entry_treatment.clear()
         self.entry_sessions.clear()
 
-    def show_patient_list(self):
+    def show_patient_list(self): #crear una ventana lista pacientes y definir las conexiones
         # Display the list in a new window
         self.patient_list_window = PatientListWindow()
-        self.patient_list_window.setWindowTitle("Patient List")
-        self.patient_list_window.setGeometry(100, 100, 600, 400)
-        self.patient_list_window.setStyleSheet("background-color: #1E3B4D; color: white;")
-
         # Connect the patient selected signal to open session window
         self.patient_list_window.patientSelected.connect(self.open_session_window)
         # Connect the start session button signal
@@ -128,15 +100,15 @@ class NeurobackApp(QWidget):
         self.patient_list_window.show()
 
     @pyqtSlot(int)
-    def open_session_window(self, patient_id):
+    def open_session_window(self, patient_id): #definimos la función para crear la conexión entre la ventana sesión y la ventana lista pacientes
         # Open a new session window for the selected patient
         self.session_window = SessionWindow(patient_id)
         self.session_window.show()
 
     @pyqtSlot(int)
-    def remove_patient(self, patient_id):
+    def remove_patient(self, patient_id): #definimos la función para remover pacientes
         # Remove the patient from the patient list
-        self.delete_patient_data(patient_id)
+        db.delete_patient_data(patient_id)
 
         # Update the patient list window
         self.patient_list_window.update_patient_list()
@@ -146,17 +118,6 @@ class NeurobackApp(QWidget):
         self.data_window = PatientDataWindow(patient_id)
         self.data_window.show()
 
-    # New method to delete patient data
-    def delete_patient_data(self, patient_id):
-        conn = sqlite3.connect('patient_data.db')
-        cursor = conn.cursor()
-
-        cursor.execute("DELETE FROM patients WHERE id_patient=?", (patient_id,))
-
-        conn.commit()
-        conn.close()
-
-
 class PatientListWindow(QWidget):
     patientSelected = pyqtSignal(int)
     startSession = pyqtSignal(int)
@@ -165,33 +126,21 @@ class PatientListWindow(QWidget):
 
     def __init__(self):#, patient_data):
         super().__init__()
-        
-        # Connect to the database
-        connection = sqlite3.connect("patient_data.db")
+        self.init_ui()
 
-        # Create a cursor
-        cursor = connection.cursor()
-
-        # Execute the query `SELECT * FROM patients`
-        cursor.execute(f"SELECT * FROM patients")
-        # Create a list to store the results
-        patient_data = []
-        row=[]
-        # Iterate over the results of the query and add them to the list
-        for row in cursor.fetchall():
-            id=row[0]
-            name=row[1]
-            age=row[2]
-            treatment=row[3]
-            sessions=row[4]
-            patient_data.append({"ID": id,"Name": name, "Age": age, "Treatment": treatment, "Sessions": sessions})
-        
-        print("La lista de pacientes es:" , patient_data)
-        # Close the cursor and the connection to the database
-        cursor.close()
-        connection.close()
-
+    def init_ui(self): #como se ve la ventana inicial
+        self.setWindowTitle("Patient List")
+        self.setGeometry(100, 100, 800, 600)
+        self.setStyleSheet("background-color: #1E3B4D; color: white;")
         self.list_widget = QListWidget()
+        self.add_list_buttons()
+       
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.list_widget)
+    
+    def add_list_buttons(self):#añadir botones
+        patient_data=db.get_patient_data()
 
         for patient in patient_data:
             id= patient["ID"]
@@ -225,187 +174,31 @@ class PatientListWindow(QWidget):
             self.list_widget.addItem(container_item)
             self.list_widget.setItemWidget(container_item, widget)
 
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.list_widget)
-    
-    def confirmar(self):
-        msg=QMessageBox()
-        msg.setWindowTitle("Confirm patient removal")
-        msg.setText("Are you sure that you want to remove this patient?")
-        msg.setStandardButtons(QMessageBox.Ok|QMessageBox.Cancel)
-        
-        x = msg.exec_()
-
-    def execute_popup_window():
-        # Create a new instance of the popup window class
-        popup_window = PopupWindow()
-
-        # Start the event loop
-        popup_window.app.exec()
-
-
     def update_patient_list(self):
         self.list_widget.clear()
-        # Connect to the database
-        connection = sqlite3.connect("patient_data.db")
-
-        # Create a cursor
-        cursor = connection.cursor()
-
-        # Execute the query `SELECT * FROM patients`
-        cursor.execute(f"SELECT * FROM patients")
-        # Create a list to store the results
-        row=[]
-        # Iterate over the results of the query and add them to the list
-        for row in cursor.fetchall():
-            id=row[0]
-            name=row[1]
-            age=row[2]
-            sessions=row[4]
-            
-            item_text = f"Name: {name}, Age: {age}, Sessions: {sessions}"
-
-            item = QListWidgetItem(item_text)
-            item.setSizeHint(QSize(0, 80))
-
-            btn_see_data = QPushButton("See Data")
-            btn_see_data.clicked.connect(lambda _, id=id: self.getData.emit(id))
-
-            btn_start_session = QPushButton("Start Session")
-            btn_start_session.clicked.connect(lambda _, name=name: self.startSession.emit(name))
-
-            btn_remove_patient = QPushButton("Remove Patient")
-            btn_remove_patient.clicked.connect(self.confirmar)
-            btn_remove_patient.clicked.connect(lambda _, id=id: self.removePatient.emit(id))
-
-            widget = QWidget()
-            layout = QHBoxLayout(widget)
-            layout.addWidget(QLabel(item_text))  # Display the name
-            layout.addWidget(btn_see_data)
-            layout.addWidget(btn_start_session)
-            layout.addWidget(btn_remove_patient)
-
-            container_item = QListWidgetItem()
-            container_item.setSizeHint(QSize(0, 80))
-            self.list_widget.addItem(container_item)
-            self.list_widget.setItemWidget(container_item, widget)
-
-        # Close the cursor and the connection to the database
-        cursor.close()
-        connection.close()
-
-
+        self.add_list_buttons()
+       
 class PatientDataWindow(QWidget):
     def __init__(self,patient_id):
         super().__init__()
+        self.init_ui(patient_id)
 
+    def init_ui(self,patient_id):
         self.plot_w = pg.PlotWidget()
         self.plot_w.setBackground((18, 60, 790))
         layout=QVBoxLayout()
-
-        connection = sqlite3.connect("patient_data.db")
-        cursor = connection.cursor()
-        cursor.execute(f"SELECT * FROM patients WHERE id_patient=?", (patient_id,))
-        datos = cursor.fetchone()
-        nombre = datos[1]
-        print(nombre)
-        cursor.execute(f"SELECT * FROM {nombre}")
-        row = []
-        self.Title = QLabel()
-        font = QFont()
-
-        # Establecer el tamaño del texto (puedes ajustar el tamaño según tus necesidades)
-        font.setPointSize(16)
-
-        # Aplicar la fuente al QLabel
-        self.Title.setFont(font)
-        def plotear_pot(n_session,name):
-
-            ruta=f"EV-EEG{name}{n_session}.csv"
-        
-            tDuracion=20
-            self.dt=12.5/1000
-            self.period=10
-            self.n_dt=11
-            #self.n_dt=2
-            fs=250
-            fases=[self.dt*i for i in range(self.n_dt)]
-            POTENCIAS=[]
-            for i in range(self.n_dt):
-                lab= open(ruta)
-                datos = np.loadtxt(lab, delimiter="\t")
-                datos=np.transpose(datos)
-                startPosition=i*int(tDuracion*fs)
-                endPosition=(i+1)*int(tDuracion*fs)-1
-                canal=7
-                x=datos[canal][startPosition:endPosition]
-                # Estimate PSD `S_xx_welch` at discrete frequencies `f_welch`
-                f_welch, S_xx_welch = signal.welch(x, fs=fs)
-                # Integrate PSD over spectral bandwidth
-                df_welch = f_welch[1] - f_welch[0]
-
-                indices_intervalo = np.where((f_welch >= 8) & (f_welch <= 12))[0]
-                # Seleccionar las frecuencias y la PSD dentro del intervalo deseado
-                S_xx_intervalo = S_xx_welch[indices_intervalo]
-                
-                POTENCIAS.append(np.sum(S_xx_intervalo) * df_welch)
-            print('POTENCIAS')
-            print(POTENCIAS)
-            potencias=np.array(POTENCIAS)
-            potencias/=np.max(potencias)
-            print('FASES')
-            print(fases)
-            print('----------')
-            self.plot_w.clear()
-            self.pen = pg.mkPen(color=(106, 255, 164))
-            self.data_line = self.plot_w.plot(fases, potencias, pen=self.pen)
-            self.plot_w.setLabel('left', 'Potencia')
-            self.plot_w.setLabel('bottom', 'Fase[ms]')
-        def on_button_click(n_session,name):
-            plotear_pot(n_session,name)
-            PAF=self.PAFs[n_session-1]
-            item_text = f"Session number: {n_session}, PAF: {PAF:.2f}"
-            self.Title.setText(item_text)
-            print(PAF)
-        filas=cursor.fetchall()
-        self.PAFs=[]
+        filas=False
         if filas:
-            for row in filas:
-                nses = row[0]
-                PAF = row[1]
-                print(PAF)
-                self.PAFs.append(PAF)                
-                if nombre and nses:
-                    button_text = "See Data from session {}".format(nses)
-                    btn_see_power = QPushButton(button_text)
-                    layout.addWidget(btn_see_power)
-                    btn_see_power.clicked.connect(lambda _, button_number=nses: on_button_click(button_number,nombre))
-                    print('nses')
-                    print(nses)
-                    print('nombre')
-                    print(nombre)
-            layout.addWidget(self.Title)
-            layout.addWidget(self.plot_w)  # Add plot_widget to layout
+            print("sos un capo amigo")
         else:
             layout.addWidget(self.Title)
             item_text='ERROR: NO SESSIONS FOUND'
             self.Title.setText(item_text)
-            
-
-                
-        cursor.close()
-        connection.close()
-
         self.setLayout(layout)  # Set layout after adding plot_widget
 
-        self.setWindowTitle(f"NeuroBack - Data Controls for {nombre}")
+        # self.setWindowTitle(f"NeuroBack - Data Controls for {nombre}")
         self.setGeometry(200, 200, 600, 400)
         self.setStyleSheet("background-color: #1E3B4D; color: white;")
-
-    
-
-
-        
 
 
 class SessionWindow(QWidget):
@@ -852,8 +645,6 @@ class SessionWindow(QWidget):
     def calc_PAF(self):
         # Cargamos los datos de las señales EEG desde un archivo
         
-        
-
         with open(self.nombre_CAL, "r") as archivo_entrada:
         # Lee el contenido del archivo
             contenido = archivo_entrada.read()

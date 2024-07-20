@@ -51,6 +51,7 @@ def delete_patient_data(patient_id):
     except sqlite3.Error as e:
         logging.error(f"Database error: {e}")
 
+
 def get_patient_session(patient_id):
     try:
         connection = sqlite3.connect("patient_data.db")

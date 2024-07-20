@@ -95,12 +95,10 @@ def phase_detection(board_shim, stop_flag,b,a,n_channel=0,delay=0):
                 
 
 
-def save(board_shim, stop_flag,access_route='DATA.csv'):
-    while not stop_flag.is_set():
-        time.sleep(2)
-        data = board_shim.get_current_board_data(100000)
-        DataFilter.write_file(data, access_route, 'w')  # use 'a' for append mode, or w
-        print("Data saved")
+def save(board_shim,access_route='DATA.csv',mode='a'):
+    data = board_shim.get_board_data(100000)
+    DataFilter.write_file(data, access_route, mode)  # use 'a' for append mode, or w
+    print("Data saved")
 
 
 
@@ -136,10 +134,6 @@ def main():
         
         phase_thread = threading.Thread(target=phase_detection, args=(board_shim, stop_flag,b,a,1))
         phase_thread.start()
-
-        save_thread = threading.Thread(target=save, args=(board_shim, stop_flag))
-        save_thread.start()
-
         
         timer_thread = threading.Thread(target=stop_program_after_interval, args=(duration, stop_flag))
         timer_thread.start()
@@ -148,6 +142,7 @@ def main():
     except BaseException:
         logging.warning('Exception', exc_info=True)
     finally:
+        save(board_shim)
         logging.info('End')
         if board_shim.is_prepared():
             logging.info('Releasing session')

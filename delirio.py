@@ -617,7 +617,7 @@ class SessionWindow(QWidget):
         df_welch = f_welch[1] - f_welch[0]
 
         indices_intervalo = np.where((f_welch >= 8) & (f_welch <= 12))[0]
-        # Seleccionar las frecuencias y la PSD dentro del intervalo deseado
+        # Seleccionar las frecuencias y la PSD dentro del  intervalo deseado
         S_xx_intervalo = S_xx_welch[indices_intervalo]
         return  np.sum(S_xx_intervalo) * df_welch #AlfaPower
         

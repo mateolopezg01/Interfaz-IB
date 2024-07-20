@@ -72,16 +72,16 @@ def PasaBanda(Fr=10,Fs=250): #devuelve a y b de 5 coef c/u
     b, a = signal.iirfilter(2, [(Fr-1),(Fr+1)], btype='band', analog=False, ftype='butter',fs=Fs)
     return b, a
 
-def phase_detection(board_shim, stop_flag,b,a,n_channel=0):
+def phase_detection(board_shim, stop_flag,b,a,n_channel=0,delay=0):
     anterior=-1
     y=[0,0,0,0,0]
     x=[0,0,0,0,0]
     while not stop_flag.is_set():
-        data = board_shim.get_current_board_data(5) # cant de canales x cant de muestras ej: data.shape=(32,5) al hacer get_current_board(data)(5) con placa Synth 
+        data = board_shim.get_current_board_data(1) # cant de canales x cant de muestras ej: data.shape=(32,1) al hacer get_current_board(data)(5) con placa Synth 
         #print(data[0][0]) #al hacer esto por muestra se imprimen un monton de veces las mismas o sea que esto se revisa muchas mas veces de las que entran muestras (OK)
         if data.size > 0:
-            if data[0][0] != anterior and len(data[0])==5:
-                if data[0][0] != anterior+1 and data[0][0]!=0:
+            if data[0][0] != anterior and len(data[0])!=0:
+                if data[0][0] != anterior+1 and data[0][0]!=0:#REVISAR el caso de ==0 si el anterior el 250
                     print('OJO, salteó muestras')
                     print(anterior,data[0][0])
                 anterior=data[0][0]
@@ -95,13 +95,12 @@ def phase_detection(board_shim, stop_flag,b,a,n_channel=0):
                 
 
 
-def save(board_shim, stop_flag):
+def save(board_shim, stop_flag,access_route='DATA.csv'):
     while not stop_flag.is_set():
-        time.sleep(5)
-        data = board_shim.get_board_data()
-        # Add your saving logic here, e.g., save to a file or database
+        time.sleep(2)
+        data = board_shim.get_current_board_data(100000)
+        DataFilter.write_file(data, access_route, 'w')  # use 'a' for append mode, or w
         print("Data saved")
-       
 
 
 
@@ -127,7 +126,7 @@ def main():
     board_id = BoardIds.SYNTHETIC_BOARD
     streamer_params = ''
     stop_flag = threading.Event()
-    duration = 90  # Set the duration in seconds after which the program should stop
+    duration = 3  # Set the duration in seconds after which the program should stop
     b,a= PasaBanda()
 
     try:

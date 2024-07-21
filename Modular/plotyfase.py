@@ -75,11 +75,11 @@ def PasaBanda(Fr=10,Fs=250): #devuelve a y b de 5 coef c/u
 def led_toggle_ON(puerto_serie,delay_time):
     # Adjust the delay time as needed (in seconds)
     time.sleep(delay_time)
-    puerto_serie.write('p'.encode())
+    puerto_serie.write(b'1')
 
 def led_toggle_OFF(puerto_serie,delay_time):
     time.sleep(delay_time) 
-    puerto_serie.write('a'.encode())
+    puerto_serie.write(b'0')
 
 def toggle_led(serial_port, led_state, delay):
     if led_state[0]:

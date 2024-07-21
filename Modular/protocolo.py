@@ -8,6 +8,7 @@ from brainflow.data_filter import DataFilter, FilterTypes, DetrendOperations
 from PyQt6 import QtWidgets, QtCore
 from scipy import signal
 import serial
+import numpy as np
 
 
 class Graph:
@@ -92,12 +93,13 @@ def toggle_led(serial_port, led_state, delay):
 
 
 
-def phase_detection(board_shim, stop_flag, b, a, serial_port, n_channel=0, delay=0):
+def phase_detection(board_shim, stop_flag, b, a, serial_port, n_channel=0, delay=0,marker=0):
     anterior=-1
     y=[0,0,0,0,0]
     x=[0,0,0,0,0]
     led_state = [False]  # Use a list to make it mutable within the nested function
-
+    data=board_shim.get_board_data()
+    board_shim.insert_marker(marker)
     while not stop_flag.is_set():
         data = board_shim.get_current_board_data(1) # cant de canales x cant de muestras ej: data.shape=(32,1) al hacer get_current_board(data)(5) con placa Synth
         if data.size > 0:
@@ -112,13 +114,13 @@ def phase_detection(board_shim, stop_flag, b, a, serial_port, n_channel=0, delay
                 y.append(yn)
                 y=y[1:]
                 if y[-1]*y[-2]<0:
-                    #print('Zero crossing detected')
+                    print('Zero crossing detected')
                     threading.Thread(target=toggle_led, args=(serial_port, led_state, delay)).start()
                 
 
 
 def save(board_shim,access_route='DATA.csv',mode='a'):
-    data = board_shim.get_board_data(100000)
+    data = board_shim.get_board_data()
     DataFilter.write_file(data, access_route, mode)  # use 'a' for append mode, or w
     print("Data saved")
 
@@ -163,7 +165,17 @@ def stop_program_after_interval(interval, stop_flag):
 
 
 
+
+
 def main():
+    Board = 'SYNTH'
+    PuertoArduino = '/dev/cu.usbmodem1101'
+    n_channel = 1
+    total_duration = 30  # duration in seconds
+    number_of_intervals = 6
+    delay_list = np.linspace(0, 200, num=number_of_intervals, endpoint=False).tolist()
+    interval_duration = total_duration / number_of_intervals
+
     BoardShim.enable_dev_board_logger()
     logging.basicConfig(level=logging.DEBUG)
 
@@ -177,32 +189,48 @@ def main():
     params.ip_protocol = 0
     params.timeout = 0
     params.file = ''
-    board_id = BoardIds.SYNTHETIC_BOARD
+    if Board == 'CYTON':
+        board_id = BoardIds.CYTON_BOARD
+    else:
+        board_id = BoardIds.SYNTHETIC_BOARD
+
     streamer_params = ''
     stop_flag = threading.Event()
-    duration = 30  # Set the duration in seconds after which the program should stop
     b, a = PasaBanda()
-    led_delay = 0  # Set the desired delay for LED toggling
 
     try:
         board_shim = BoardShim(board_id, params)
         board_shim.prepare_session()
         board_shim.start_stream(450000, streamer_params)
-        PuertoArduino='/dev/cu.usbmodem1101'
         # Initialize your serial port object here
         serial_port = serial.Serial(PuertoArduino, 2000000)
-        n_channel=1
-        phase_thread = threading.Thread(target=phase_detection, args=(board_shim, stop_flag, b, a, serial_port, n_channel, led_delay))
-        phase_thread.start()
 
-        timer_thread = threading.Thread(target=stop_program_after_interval, args=(duration, stop_flag))
-        timer_thread.start()
+        # Start the for loop and delay threads in the main thread
+        for index, delay in enumerate(delay_list):
+            print('index', index,'delay',delay)
+            delay=delay/1000
+            stop_flag.clear()
 
-        Graph(board_shim, stop_flag,n_channel)
+            # Ensure the marker value is not zero
+            marker_value = index + 1
+
+            phase_thread = threading.Thread(target=phase_detection,
+                                            args=(board_shim, stop_flag, b, a, serial_port, n_channel, delay, marker_value))
+            phase_thread.start()
+
+            timer_thread = threading.Thread(target=stop_program_after_interval, args=(interval_duration, stop_flag))
+            timer_thread.start()
+
+            # Wait for the timer thread to finish before starting the next interval
+            timer_thread.join()
+            save(board_shim)
+
+        # Start the Graph in the main thread after the loop
+        Graph(board_shim, stop_flag, n_channel)
+
     except BaseException:
         logging.warning('Exception', exc_info=True)
     finally:
-        save(board_shim)
         logging.info('End')
         if board_shim.is_prepared():
             logging.info('Releasing session')

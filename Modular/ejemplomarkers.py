@@ -1,49 +1,38 @@
-
-import time
-import logging
-from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds, BrainFlowPresets
+from brainflow.data_filter import DataFilter
 import matplotlib.pyplot as plt
+import numpy as np
+def get_data_from_file(access_route='DATA.csv', channel_list=None, n_start=0, n_end=None):  
+    """
+    Reads data from a file and returns the selected portion.
 
-def main():
-    BoardShim.enable_dev_board_logger()
+    Parameters:
+    access_route (str): Path to the data file.
+    channel_list (list): List of channel indices to select.
+    n_start (int): Starting index for data slicing.
+    n_end (int or None): Ending index for data slicing. If None, selects till the end.
 
-    params = BrainFlowInputParams()
-    params.ip_port = 0
-    params.serial_port = ''
-    params.mac_address = ''
-    params.other_info = ''
-    params.serial_number = ''
-    params.ip_address = ''
-    params.ip_protocol = 0
-    params.timeout = 0
-    params.file = ''
-    board_id = BoardIds.SYNTHETIC_BOARD
-    streamer_params = ''
+    Returns:
+    numpy.ndarray: Selected data.
+    """
     try:
-        board_shim = BoardShim(board_id, params)
-        board_shim.prepare_session()
-        board_shim.start_stream(450000, streamer_params)
-    except BaseException:
-        logging.warning('Exception', exc_info=True)
-    finally:
-        logging.info('End')
-        if board_shim.is_prepared():
-            logging.info('Releasing session')
-            board_shim.release_session()
+        # Read the data file
+        data = DataFilter.read_file(access_route)
+        
+        # Handle slicing with n_end=None correctly
+        data_slice = data[:, n_start:n_end] if n_end is not None else data[:, n_start:]
+        
+        # If channel_list is provided, select specified channels
+        if channel_list is not None:
+            data_slice = data_slice[channel_list]
+            
+        return data_slice
+    
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+    
 
-    board_shim.prepare_session()
 
-    board_shim.start_stream()
-    for i in range(10):
-        time.sleep(1)
-        board_shim.insert_marker(i + 1)
-    data = board_shim.get_board_data()
-    board_shim.stop_stream()
-    board_shim.release_session()
-
-    print(data[-1])
-    plt.plot(data[-1])
-    plt.show()
-
-if __name__ == "__main__":
-    main()
+plt.plot(np.transpose(get_data_from_file(access_route='DATA.csv', channel_list=[-1], n_start=0, n_end=None)))
+plt.show()
+print('Hola')

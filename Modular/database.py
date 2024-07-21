@@ -70,3 +70,25 @@ def get_patient_session(patient_id):
     except sqlite3.Error as e:
         logging.error(f"Database error: {e}")
         return {"name": "", "n_session": 1}
+    
+
+def save_session_data(patient_id, duration, phases_applied, record_channel):
+    try:
+        connection = sqlite3.connect("patient_data.db")
+        cursor = connection.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                session_num INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_patient INTEGER,
+                duration FLOAT,
+                phases_applied TEXT,
+                record_channel TEXT,
+                FOREIGN KEY (id_patient) REFERENCES patients (id_patient)
+            )
+        """)
+        cursor.execute("INSERT INTO sessions (id_patient, duration, phases_applied, record_channel) VALUES (?, ?, ?, ?)", 
+                       (patient_id, duration, phases_applied, record_channel))
+        connection.commit()
+        connection.close()
+    except sqlite3.Error as e:
+        logging.error(f"Database error: {e}")

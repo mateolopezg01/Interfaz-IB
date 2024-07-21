@@ -1,3 +1,4 @@
+#SESION DE SECUENCIAS DE FASES CON GRAFICO.
 import logging
 import threading
 import time
@@ -106,7 +107,7 @@ def stop_program_after_interval(interval, stop_flag):
     stop_flag.set()
 
 
-def Stimulation_Sequence(board_shim,serial_port, n_channel,b,a,total_duration,number_of_intervals,stop_flag):
+def Stimulation_Sequence(board_shim,serial_port, n_channel,b,a,total_duration,number_of_intervals,stop_flag,access_route='DATA.csv'):
     delay_list = np.linspace(0, 200, num=number_of_intervals, endpoint=False).tolist()
     interval_duration = total_duration / number_of_intervals
     # Start the for loop and delay threads in the main thread
@@ -128,7 +129,7 @@ def Stimulation_Sequence(board_shim,serial_port, n_channel,b,a,total_duration,nu
         # Wait for the timer thread to finish before starting the next interval
         timer_thread.join()
         
-        save(board_shim)
+        save(board_shim,access_route,'w')
 
 class Graph:
     def __init__(self, board_shim,n_channel=1):

@@ -1,0 +1,103 @@
+from PyQt6.QtWidgets import  QComboBox, QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QListWidget, QListWidgetItem, QSizePolicy, QHBoxLayout, QProgressBar
+from PyQt6.QtCore import  Qt, pyqtSignal, pyqtSlot, QSize, QTimer
+from PyQt6.QtGui import QFont 
+from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
+from brainflow.data_filter import DataFilter
+import sys
+import numpy as np
+from scipy import signal
+import pyqtgraph as pg
+import time
+import sqlite3
+import pyaudio
+import time
+import serial
+import threading
+import database as db
+from serial.tools import list_ports
+
+class VentanaParametros(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+    def init_ui(self):
+        self.setWindowTitle("Session parameters configuration")
+        self.setGeometry(100, 100, 800, 600)
+        self.setStyleSheet("background-color: #1E3B4D; color: white;")
+        self.list_widget = QListWidget()
+
+        self.insertar_filas_parametros()
+        # Button to save information
+        self.btn_save = QPushButton("Save", self)
+        self.btn_save.clicked.connect(self.save_data)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.list_widget)
+        layout.addWidget(self.btn_save)
+
+    def fila_parametro(self, parametro, nombre_parametro, items):
+        item_text=nombre_parametro
+        item = QListWidgetItem(item_text)
+        item.setSizeHint(QSize(0, 80))
+
+        parametro.addItems(items)
+
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.addWidget(QLabel(item_text))
+        layout.addWidget(parametro)
+
+        container_item = QListWidgetItem()
+        container_item.setSizeHint(QSize(0, 80))
+        self.list_widget.addItem(container_item)
+        self.list_widget.setItemWidget(container_item, widget)
+
+    def insertar_filas_parametros(self):
+        self.numfases=QComboBox()
+        self.fila_parametro(self.numfases,"Number of phases:",[str(i) for i in range(2,21)])
+        self.duration=QComboBox()
+        self.fila_parametro(self.duration,"Duration (minutes):",[str(i) for i in range(5,31)])
+        lista_puertos=list_ports.comports()
+        self.puerto=QComboBox()
+        self.fila_parametro(self.puerto,"Serial port:",[str(port)for port in lista_puertos])
+        lista_puertos.append("Synthethic")
+        self.placa=QComboBox()
+        self.fila_parametro(self.placa,"Board:",[str(port)for port in lista_puertos])
+    
+    def save_data(self):
+        nphases = self.numfases.currentText()
+        duration = self.duration.currentText()
+        puerto = self.puerto.currentText()
+        placa = self.placa.currentText()
+
+        self.session_window = SessionWindow(nphases,duration,puerto,placa)
+        self.session_window.show()
+        self.close()
+
+
+class SessionWindow(QWidget):
+    def __init__(self,nphases,duration,puerto,placa):
+        super().__init__()
+        self.init_ui(nphases,duration,puerto,placa)
+    def init_ui(self,nphases,duration,puerto,placa):
+        self.setWindowTitle("Session parameters configuration")
+        self.setGeometry(100, 100, 800, 600)
+        self.setStyleSheet("background-color: #1E3B4D; color: white;")
+        layout = QVBoxLayout(self)
+        self.etiqueta_fases = QLabel(nphases)
+        layout.addWidget(self.etiqueta_fases)
+        self.etiqueta_duration = QLabel(duration)
+        layout.addWidget(self.etiqueta_duration)
+        self.etiqueta_puerto = QLabel(puerto)
+        layout.addWidget(self.etiqueta_puerto)
+        self.etiqueta_placa = QLabel(placa)
+        layout.addWidget(self.etiqueta_placa)
+
+
+
+        
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = VentanaParametros()
+    window.show()
+    sys.exit(app.exec())

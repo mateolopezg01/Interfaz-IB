@@ -129,7 +129,7 @@ def Stimulation_Sequence(board_shim,serial_port, n_channel,b,a,total_duration,nu
         # Wait for the timer thread to finish before starting the next interval
         timer_thread.join()
         
-        save(board_shim,access_route,'w')
+        save(board_shim,access_route,'a')
 
 class Graph:
     def __init__(self, board_shim,n_channel=1):
@@ -211,8 +211,9 @@ def main():
 
     streamer_params = ''
     stop_flag = threading.Event()
-    b, a = PasaBanda()
-
+    PAF=10
+    sampling_rate=BoardShim.get_sampling_rate(board_id)
+    b, a = PasaBanda(PAF,sampling_rate)
     try:
         board_shim = BoardShim(board_id, params)
         board_shim.prepare_session()

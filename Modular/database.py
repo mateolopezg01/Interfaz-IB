@@ -72,7 +72,7 @@ def get_patient_session(patient_id):
         return {"name": "", "n_session": 1}
     
 
-def save_session_data(patient_id, duration, phases_applied, record_channel):
+def save_session_data(patient_id, duration, phases_applied, record_channel, paf):
     try:
         connection = sqlite3.connect("patient_data.db")
         cursor = connection.cursor()
@@ -83,11 +83,12 @@ def save_session_data(patient_id, duration, phases_applied, record_channel):
                 duration FLOAT,
                 phases_applied TEXT,
                 record_channel TEXT,
+                paf FLOAT,
                 FOREIGN KEY (id_patient) REFERENCES patients (id_patient)
             )
         """)
-        cursor.execute("INSERT INTO sessions (id_patient, duration, phases_applied, record_channel) VALUES (?, ?, ?, ?)", 
-                       (patient_id, duration, phases_applied, record_channel))
+        cursor.execute("INSERT INTO sessions (id_patient, duration, phases_applied, record_channel, paf) VALUES (?, ?, ?, ?, ?)", 
+                       (patient_id, duration, phases_applied, record_channel, paf))
         connection.commit()
         connection.close()
     except sqlite3.Error as e:

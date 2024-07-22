@@ -121,7 +121,7 @@ class Graph:
         self.app.processEvents()
 
 def main():
-    Board = 'SYNTH'
+    Board = 'CYTON'
     PuertoArduino = '/dev/cu.usbmodem1101'
     n_channel = 1
     total_duration = 30  # duration in seconds
@@ -132,7 +132,6 @@ def main():
 
     params = BrainFlowInputParams()
     params.ip_port = 0
-    params.serial_port = ''
     params.mac_address = ''
     params.other_info = ''
     params.serial_number = ''
@@ -142,9 +141,10 @@ def main():
     params.file = ''
     if Board == 'CYTON':
         board_id = BoardIds.CYTON_BOARD
+        params.serial_port = '/dev/cu.usbserial-DM03H6KD'
     else:
         board_id = BoardIds.SYNTHETIC_BOARD
-
+        params.serial_port = ''
     streamer_params = ''
     stop_flag = threading.Event()
     try:
@@ -154,7 +154,8 @@ def main():
         # Initialize your serial port object here
         serial_port = serial.Serial(PuertoArduino, 2000000)
         # Start the Stimulation_Sequence in a separate thread
-        resting_thread = threading.Thread(target=REST, args=(board_shim,duration,access_route='DATA.csv'))
+        duration=30
+        resting_thread = threading.Thread(target=REST, args=(board_shim,duration))
         resting_thread.start()
 
         # Start the Graph in the main thread

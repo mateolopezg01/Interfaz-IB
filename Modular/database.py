@@ -72,10 +72,23 @@ def get_patient_session(patient_id):
         return {"name": "", "n_session": 1}
     
 
-def save_session_data(patient_id, duration, phases_applied, record_channel, paf):
+def save_session_data(patient_id, duration, phases_applied, record_channel, paf, powers):
+    """
+    Save session data to the SQLite database.
+
+    Parameters:
+    patient_id (int): ID of the patient.
+    duration (float): Duration of the session.
+    phases_applied (str): Phases applied during the session.
+    record_channel (str): Recording channel used.
+    paf (float): PAF value for the session.
+    powers (str): Powers data for the session.
+    """
+    connection = None
     try:
         connection = sqlite3.connect("patient_data.db")
         cursor = connection.cursor()
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 session_num INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,12 +97,62 @@ def save_session_data(patient_id, duration, phases_applied, record_channel, paf)
                 phases_applied TEXT,
                 record_channel TEXT,
                 paf FLOAT,
+                powers TEXT,
                 FOREIGN KEY (id_patient) REFERENCES patients (id_patient)
             )
         """)
-        cursor.execute("INSERT INTO sessions (id_patient, duration, phases_applied, record_channel, paf) VALUES (?, ?, ?, ?, ?)", 
-                       (patient_id, duration, phases_applied, record_channel, paf))
+        
+        cursor.execute("""
+            INSERT INTO sessions (id_patient, duration, phases_applied, record_channel, paf, powers)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (patient_id, duration, phases_applied, record_channel, paf, powers))
+        
         connection.commit()
-        connection.close()
     except sqlite3.Error as e:
         logging.error(f"Database error: {e}")
+    finally:
+        if connection:
+            connection.close()
+    
+
+def get_sessions_by_patient_id(patient_id):
+    """
+    Retrieve all sessions for a given patient ID from the SQLite database.
+
+    Parameters:
+    patient_id (int): ID of the patient.
+
+    Returns:
+    list: A list of dictionaries containing session data.
+    """
+    connection = None
+    sessions = []
+    try:
+        connection = sqlite3.connect("patient_data.db")
+        cursor = connection.cursor()
+        
+        cursor.execute("""
+            SELECT session_num, id_patient, duration, phases_applied, record_channel, paf, powers
+            FROM sessions
+            WHERE id_patient = ?
+        """, (patient_id,))
+        
+        rows = cursor.fetchall()
+        for row in rows:
+            session = {
+                "session_num": row[0],
+                "id_patient": row[1],
+                "duration": row[2],
+                "phases_applied": row[3],
+                "record_channel": row[4],
+                "paf": row[5],
+                "powers": row[6]
+            }
+            sessions.append(session)
+    except sqlite3.Error as e:
+        logging.error(f"Database error: {e}")
+    finally:
+        if connection:
+            connection.close()
+    
+    return sessions

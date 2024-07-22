@@ -3,6 +3,7 @@ import time
 from brainflow.data_filter import DataFilter
 from scipy import signal
 import numpy as np
+from database import save_session_data
 
 def PasaBanda(Fr=10,Fs=250): #devuelve a y b de 5 coef c/u
     b, a = signal.iirfilter(2, [(Fr-1),(Fr+1)], btype='band', analog=False, ftype='butter',fs=Fs)
@@ -100,10 +101,12 @@ def stop_program_after_interval(interval, stop_flag):
     stop_flag.set()
 
 
-def Stimulation_Sequence(board_shim,serial_port, n_channel,delay_list,interval_duration,stop_flag,access_route='DATA_estim.csv',PAF=10):
-    PAF=10
+def Stimulation_Sequence(board_shim,serial_port, n_channel,delay_list,interval_duration,stop_flag,access_route='DATA_estim.csv',patient_id=1):
+    PAF=REST(board_shim)
+    print(PAF)
     sampling_rate=250
     b, a = PasaBanda(PAF,sampling_rate)
+    print('PAF:',PAF)
     # Start the for loop and delay threads in the main thread
     for index, delay in enumerate(delay_list):
         print('index', index,'delay',delay)
@@ -122,8 +125,12 @@ def Stimulation_Sequence(board_shim,serial_port, n_channel,delay_list,interval_d
         
         # Wait for the timer thread to finish before starting the next interval
         timer_thread.join()
-        
-        save(board_shim,access_route,'a')
+    delay_string = ', '.join(map(str, delay_list))
+    print(delay_string)
+    save(board_shim,access_route,'a')
+    powers=AlphaPowerFromFile(n_channel,sampling_rate,access_route)
+    powers_string = ', '.join(map(str, powers))
+    save_session_data(patient_id, interval_duration*len(delay_list), delay_string , n_channel, PAF,powers_string)
 
 
 def save_REST(board_shim,total_duration,access_route='DATA.csv'):
@@ -132,7 +139,7 @@ def save_REST(board_shim,total_duration,access_route='DATA.csv'):
     save(board_shim,access_route,mode='w')
 
 
-def REST(board_shim,total_duration=60,n_channel=4,access_route='DATA.csv',sampling_rate=250):
+def REST(board_shim,total_duration=5,n_channel=4,access_route='DATA.csv',sampling_rate=250):
     save_REST(board_shim,total_duration,access_route)
     data=get_data_from_file(access_route, channel_list=[n_channel], n_start=0, n_end=None)
     data=np.transpose(data)
@@ -211,29 +218,31 @@ def splice_signal(signal_markers):
         segments.append(signal[start_idx:end_idx].reshape(1, -1))
     
     # Add the last segment from the last marker to the end of the signal
-    last_start_idx = marker_indices[-1]
-    segments.append(signal[last_start_idx:].reshape(1, -1))
+    # last_start_idx = marker_indices[-1]
+    # segments.append(signal[last_start_idx:].reshape(1, -1))
     
     return segments
 
 
-def AlphaPowerFromFile(n_channel,sampling_rate,access_route='DATA.csv'):
-    channel_data=(get_data_from_file(access_route, channel_list=[n_channel,-1], n_start=0, n_end=None))
-    segments=splice_signal(channel_data)
+def AlphaPowerFromFile(n_channel, sampling_rate, access_route='DATA.csv'):
+    channel_data = get_data_from_file(access_route, channel_list=[n_channel, -1], n_start=0, n_end=None)
+    segments = splice_signal(channel_data)
 
-    POWERS=[]
+    POWERS = []
     for segment in segments:
-        segment=np.transpose(segment)
-        length=len(segment)
-        fft_result = np.fft.fft(segment,axis=0)
-        frequencies = np.fft.fftfreq(length, 1/sampling_rate)
-        # # Take the magnitude of the FFT
+        segment = np.transpose(segment)
+        length = len(segment)
+        fft_result = np.fft.fft(segment, axis=0)
+        frequencies = np.fft.fftfreq(length, 1 / sampling_rate)
         power_spectrum = np.abs(fft_result) ** 2
         
-        # Filter the frequencies to the desired range
         filtered_indices = np.where((frequencies >= 8) & (frequencies <= 12))[0]
-        # Calculate the power in the specified frequency band
         power_in_band = np.sum(power_spectrum[filtered_indices])
         POWERS.append(power_in_band)
-        POWERS_np=np.array(POWERS)
-    return (POWERS_np/np.max(POWERS_np))
+    
+    if not POWERS:
+        return np.array([])
+
+    POWERS_np = np.array(POWERS)
+    return POWERS_np / np.max(POWERS_np)
+

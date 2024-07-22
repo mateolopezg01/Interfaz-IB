@@ -268,7 +268,7 @@ class VentanaParametros(QWidget):
         self.numfases=QComboBox()
         self.fila_parametro(self.numfases,"Number of phases:",[str(i) for i in range(2,21)])
         self.duration=QComboBox()
-        self.fila_parametro(self.duration,"Duration (minutes):",[str(i) for i in range(5,31)])
+        self.fila_parametro(self.duration,"Duration (minutes):",[str(i) for i in range(1,31)])
         lista_puertos=list_ports.comports()
         self.puerto=QComboBox()
         self.fila_parametro(self.puerto,"Serial port:",[str(port)for port in lista_puertos])
@@ -287,103 +287,6 @@ class VentanaParametros(QWidget):
         self.close()
 
 
-class RestWindow(QWidget):
-    def __init__(self, placa):
-        super().__init__()
-        self.init_ui(nphases, duration, puerto, placa)
-
-    def init_ui(self, placa):
-        self.setWindowTitle("Calibration Window")
-        self.setGeometry(100, 100, 800, 600)
-        self.setStyleSheet("background-color: #1E3B4D; color: white;")
-
-        board= str(placa.split(' ',1)[0])
-        self.board=board
-        self.n_channel=1
-
-        # Layout for the session window
-        layout = QVBoxLayout(self)
-        self.board_shim=self.parametros_brainflow(self.board)
-
-        # Initialize BrainFlow and plotting      
-        self.init_brainflow(nfases, duracion,port,self.board)
-
-        # Add plot widget to layout
-        self.plot_widget = pg.GraphicsLayoutWidget()
-        layout.addWidget(self.plot_widget)
-        self._init_timeseries()
-
-        # Start the timer for updating the plot
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update)
-        self.timer.start(50)  # update every 50 ms
-
-
-    def init_brainflow(self,number_of_intervals,total_duration,PuertoArduino = '/dev/cu.usbmodem1101',Board = 'Synthetic',n_channel=0):
-        BoardShim.enable_dev_board_logger()
-        self.board_shim,streamer_params=self.parametros_brainflow(Board)
-        self.stop_flag = threading.Event()
-        self.board_shim.prepare_session()
-        self.board_shim.start_stream(450000, streamer_params)
-        interval_duration = 60
-        # Start the Stimulation_Sequence in a separate thread
-        stimulation_thread = threading.Thread(target=Stimulation_Sequence, args=(self.board_shim, self.serial_port, n_channel, delay_list,interval_duration, self.stop_flag,access_route='DATA_Stim.csv',PAF=self.PAF))
-        stimulation_thread.start()
-
-        # Board info
-        self.board_id = self.board_shim.get_board_id()
-        self.exg_channels = BoardShim.get_exg_channels(self.board_id)
-        self.sampling_rate = BoardShim.get_sampling_rate(self.board_id)
-        self.window_size = 2
-        self.num_points = self.window_size * self.sampling_rate
-
-    def parametros_brainflow(self,Board):
-        params = BrainFlowInputParams()
-        params.ip_port = 0
-        params.serial_port = ''
-        params.mac_address = ''
-        params.other_info = ''
-        params.ip_address = ''
-        params.ip_protocol = 0
-        params.timeout = 0
-        params.file = ''
-        board_id,params.serialport=self.obtener_id_placa(Board)
-        streamer_params = ''
-        board_shim = BoardShim(board_id, params)
-        return board_shim, streamer_params
-
-    def _init_timeseries(self):
-        self.plots = []
-        self.curves = []
-        for i in range(1):  # Only one channel as per the original requirement
-            p = self.plot_widget.addPlot(row=i, col=0)
-            p.showAxis('left', True)
-            p.setMenuEnabled('left', False)
-            p.showAxis('bottom', False)
-            p.setMenuEnabled('bottom', False)
-            if i == 0:
-                p.setTitle('TimeSeries Plot')
-            self.plots.append(p)
-            curve = p.plot()
-            self.curves.append(curve)
-
-    def update(self):
-        data = self.board_shim.get_current_board_data(self.num_points)
-        self.curves[0].setData(data[self.n_channel].tolist())
-    def comenzar_rest(self):
-        self.falfapico=REST(self.board_shim)
-
-    def obtener_id_placa(self,Board):
-        if Board == 'Synthetic':
-            board_id = BoardIds.SYNTHETIC_BOARD
-            serial_port = ''
-        else:
-            board_id = BoardIds.CYTON_BOARD
-            serial_port = Board
-        return board_id , serial_port
-
-
-
 class SessionWindow(QWidget):
     def __init__(self, nphases, duration, puerto, placa):
         super().__init__()
@@ -400,7 +303,7 @@ class SessionWindow(QWidget):
         port= str(puerto.split(' ',1)[0])
         board= str(placa.split(' ',1)[0])
         self.board=board
-        self.n_channel=1
+        self.n_channel=4
 
         # Layout for the session window
         layout = QVBoxLayout(self)
@@ -421,9 +324,12 @@ class SessionWindow(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update)
         self.timer.start(50)  # update every 50 ms
+        self.timer2 = QTimer()
+        self.timer2.timeout.connect(self.close)
+        self.timer2.start(120000)
 
 
-    def init_brainflow(self,number_of_intervals,total_duration,PuertoArduino = '/dev/cu.usbmodem1101',Board = 'Synthetic',n_channel=0):
+    def init_brainflow(self,number_of_intervals,total_duration,PuertoArduino = '/dev/cu.usbmodem1101',Board = 'Synthetic',n_channel=4):
         BoardShim.enable_dev_board_logger()
         self.board_shim,streamer_params=self.parametros_brainflow(Board)
         self.stop_flag = threading.Event()
@@ -435,7 +341,7 @@ class SessionWindow(QWidget):
         random.shuffle(delay_list)
         interval_duration = total_duration / number_of_intervals
         # Start the Stimulation_Sequence in a separate thread
-        stimulation_thread = threading.Thread(target=Stimulation_Sequence, args=(self.board_shim, self.serial_port, n_channel, delay_list,interval_duration, self.stop_flag,access_route='DATA_Stim.csv',PAF=self.PAF))
+        stimulation_thread = threading.Thread(target=Stimulation_Sequence, args=(self.board_shim, self.serial_port, n_channel, delay_list,interval_duration, self.stop_flag))
         stimulation_thread.start()
 
         # Board info

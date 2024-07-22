@@ -132,7 +132,7 @@ def save_REST(board_shim,total_duration,access_route='DATA.csv'):
     save(board_shim,access_route,mode='w')
 
 
-def REST(board_shim,total_duration,n_channel,access_route='DATA.csv',sampling_rate=250):
+def REST(board_shim,total_duration=60,n_channel=4,access_route='DATA.csv',sampling_rate=250):
     save_REST(board_shim,total_duration,access_route)
     data=get_data_from_file(access_route, channel_list=[n_channel], n_start=0, n_end=None)
     data=np.transpose(data)

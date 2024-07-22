@@ -34,8 +34,9 @@ import threading
 import random
 import database as db
 from serial.tools import list_ports
-from signal_processing import Stimulation_Sequence
+from signal_processing import Stimulation_Sequence, REST
 from PyQt6 import QtWidgets, QtCore
+
 
 
 
@@ -228,6 +229,7 @@ class PatientDataWindow(QWidget):
         self.setStyleSheet("background-color: #1E3B4D; color: white;")
 
 class VentanaParametros(QWidget):
+    
     def __init__(self):
         super().__init__()
         self.init_ui()
@@ -285,6 +287,7 @@ class VentanaParametros(QWidget):
         self.close()
 
 
+
 class SessionWindow(QWidget):
     def __init__(self, nphases, duration, puerto, placa):
         super().__init__()
@@ -300,14 +303,18 @@ class SessionWindow(QWidget):
         duracion = int(duration) * 60  # Convert minutes to seconds
         port= str(puerto.split(' ',1)[0])
         board= str(placa.split(' ',1)[0])
+        self.board=board
         self.n_channel=1
 
         # Layout for the session window
         layout = QVBoxLayout(self)
+        self.board_shim=self.parametros_brainflow(self.board)
+        # self.btn_calibracion=QPushButton("Start Rest",self)
+        # self.btn_calibracion.clicked.connect(self.init_brainflow_rest)
+        # layout.addWidget(self.btn_calibracion)
 
-        # Initialize BrainFlow and plotting
-        print(str(nfases)+str( duracion)+str(port)+str(board))        
-        self.init_brainflow(nfases, duracion,port,board)
+        # Initialize BrainFlow and plotting      
+        self.init_brainflow(nfases, duracion,port,self.board)
 
         # Add plot widget to layout
         self.plot_widget = pg.GraphicsLayoutWidget()
@@ -319,16 +326,21 @@ class SessionWindow(QWidget):
         self.timer.timeout.connect(self.update)
         self.timer.start(50)  # update every 50 ms
 
+
     def init_brainflow(self,number_of_intervals,total_duration,PuertoArduino = '/dev/cu.usbmodem1101',Board = 'Synthetic',n_channel=0):
         BoardShim.enable_dev_board_logger()
-        self.parametros_brainflow(Board)
+        self.board_shim,streamer_params=self.parametros_brainflow(Board)
+        self.stop_flag = threading.Event()
+        self.board_shim.prepare_session()
+        self.board_shim.start_stream(450000, streamer_params)
         # Initialize your serial port object here
         self.serial_port = serial.Serial(PuertoArduino, 2000000)
         delay_list = np.linspace(0, 200, num=number_of_intervals, endpoint=False).tolist()
         random.shuffle(delay_list)
         interval_duration = total_duration / number_of_intervals
         # Start the Stimulation_Sequence in a separate thread
-        stimulation_thread = threading.Thread(target=Stimulation_Sequence, args=(self.board_shim, self.serial_port, n_channel, delay_list,interval_duration, self.stop_flag))
+        self.PAF=REST(self.board_shim)
+        stimulation_thread = threading.Thread(target=Stimulation_Sequence, args=(self.board_shim, self.serial_port, n_channel, delay_list,interval_duration, self.stop_flag,access_route='DATA_Stim.csv',PAF=self.PAF))
         stimulation_thread.start()
 
         # Board info
@@ -348,18 +360,10 @@ class SessionWindow(QWidget):
         params.ip_protocol = 0
         params.timeout = 0
         params.file = ''
-        if Board == 'Synthetic':
-            board_id = BoardIds.SYNTHETIC_BOARD
-            params.serial_port = ''
-        else:
-            board_id = BoardIds.CYTON_BOARD
-            params.serial_port = Board
+        board_id,params.serialport=self.obtener_id_placa(Board)
         streamer_params = ''
-        self.stop_flag = threading.Event()
-
-        self.board_shim = BoardShim(board_id, params)
-        self.board_shim.prepare_session()
-        self.board_shim.start_stream(450000, streamer_params)
+        board_shim = BoardShim(board_id, params)
+        return board_shim, streamer_params
 
     def _init_timeseries(self):
         self.plots = []
@@ -379,7 +383,17 @@ class SessionWindow(QWidget):
     def update(self):
         data = self.board_shim.get_current_board_data(self.num_points)
         self.curves[0].setData(data[self.n_channel].tolist())
+    def comenzar_rest(self):
+        self.falfapico=REST(self.board_shim)
 
+    def obtener_id_placa(self,Board):
+        if Board == 'Synthetic':
+            board_id = BoardIds.SYNTHETIC_BOARD
+            serial_port = ''
+        else:
+            board_id = BoardIds.CYTON_BOARD
+            serial_port = Board
+        return board_id , serial_port
 
 
 if __name__ == "__main__":

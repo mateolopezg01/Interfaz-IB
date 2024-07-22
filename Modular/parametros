@@ -99,7 +99,7 @@ class SessionWindow(QWidget):
         layout = QVBoxLayout(self)
 
         # Initialize BrainFlow and plotting
-        # self.init_brainflow(nfases, duracion,port,board)
+        self.init_brainflow(nfases, duracion,port,board)
 
         # Add plot widget to layout
         self.plot_widget = pg.GraphicsLayoutWidget()
@@ -108,38 +108,12 @@ class SessionWindow(QWidget):
 
         # Start the timer for updating the plot
         self.timer = QTimer()
-        # self.timer.timeout.connect(self.update)
+        self.timer.timeout.connect(self.update)
         self.timer.start(50)  # update every 50 ms
 
-    def init_brainflow(self,number_of_intervals,total_duration,PuertoArduino = '/dev/cu.usbmodem1101',Board = 'SYNTH',n_channel=0):
-        self.n_channel = n_channel
-        total_duration = self.duration  # duration in seconds
-        number_of_intervals = self.nphases
-
+    def init_brainflow(self,number_of_intervals,total_duration,PuertoArduino = '/dev/cu.usbmodem1101',Board = 'Synthetic',n_channel=0):
         BoardShim.enable_dev_board_logger()
-
-        params = BrainFlowInputParams()
-        params.ip_port = 0
-        params.serial_port = ''
-        params.mac_address = ''
-        params.other_info = ''
-        params.ip_address = ''
-        params.ip_protocol = 0
-        params.timeout = 0
-        params.file = ''
-        if Board == 'CYTON':
-            board_id = BoardIds.CYTON_BOARD
-            params.serial_port = self.puerto
-        else:
-            board_id = BoardIds.SYNTHETIC_BOARD
-            params.serial_port = ''
-
-        streamer_params = ''
-        self.stop_flag = threading.Event()
-
-        self.board_shim = BoardShim(board_id, params)
-        self.board_shim.prepare_session()
-        self.board_shim.start_stream(450000, streamer_params)
+        self.parametros_brainflow(Board)
         # Initialize your serial port object here
         self.serial_port = serial.Serial(PuertoArduino, 2000000)
         # Start the Stimulation_Sequence in a separate thread
@@ -152,6 +126,29 @@ class SessionWindow(QWidget):
         self.sampling_rate = BoardShim.get_sampling_rate(self.board_id)
         self.window_size = 2
         self.num_points = self.window_size * self.sampling_rate
+
+    def parametros_brainflow(self,Board):
+        params = BrainFlowInputParams()
+        params.ip_port = 0
+        params.serial_port = ''
+        params.mac_address = ''
+        params.other_info = ''
+        params.ip_address = ''
+        params.ip_protocol = 0
+        params.timeout = 0
+        params.file = ''
+        if Board == 'Synthetic':
+            board_id = BoardIds.SYNTHETIC_BOARD
+            params.serial_port = ''
+        else:
+            board_id = BoardIds.CYTON_BOARD
+            params.serial_port = Board
+        streamer_params = ''
+        self.stop_flag = threading.Event()
+
+        self.board_shim = BoardShim(board_id, params)
+        self.board_shim.prepare_session()
+        self.board_shim.start_stream(450000, streamer_params)
 
     def _init_timeseries(self):
         self.plots = []

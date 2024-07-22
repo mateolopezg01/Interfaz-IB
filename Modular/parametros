@@ -88,18 +88,18 @@ class SessionWindow(QWidget):
         self.setStyleSheet("background-color: #1E3B4D; color: white;")
 
         # Update to reflect passed parameters
-        self.nphases = int(nphases)
-        self.duration = int(duration) * 60  # Convert minutes to seconds
-        self.puerto = puerto
-        self.placa = placa
+        nfases= int(nphases)
+        duracion = int(duration) * 60  # Convert minutes to seconds
+        port= puerto.split(' ',1)[0]
+        board= placa.split(' ',1)[0]
 
-        print('nphases:', nphases, '\n', 'duration', duration, '\npuerto:', puerto, '\nplaca:', placa)
+        print('nphases:', nphases, '\n', 'duration', duration, '\npuerto:', port, '\nplaca:', placa)
 
         # Layout for the session window
         layout = QVBoxLayout(self)
 
         # Initialize BrainFlow and plotting
-        self.init_brainflow()
+        # self.init_brainflow(nfases, duracion,port,board)
 
         # Add plot widget to layout
         self.plot_widget = pg.GraphicsLayoutWidget()
@@ -108,13 +108,10 @@ class SessionWindow(QWidget):
 
         # Start the timer for updating the plot
         self.timer = QTimer()
-        self.timer.timeout.connect(self.update)
+        # self.timer.timeout.connect(self.update)
         self.timer.start(50)  # update every 50 ms
 
-    def init_brainflow(self):
-        Board = 'SYNTH'
-        PuertoArduino = '/dev/cu.usbmodem1101'
-        n_channel=0
+    def init_brainflow(self,number_of_intervals,total_duration,PuertoArduino = '/dev/cu.usbmodem1101',Board = 'SYNTH',n_channel=0):
         self.n_channel = n_channel
         total_duration = self.duration  # duration in seconds
         number_of_intervals = self.nphases

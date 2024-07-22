@@ -125,9 +125,10 @@ def Stimulation_Sequence(board_shim,serial_port, n_channel,delay_list,interval_d
         
         # Wait for the timer thread to finish before starting the next interval
         timer_thread.join()
+        save(board_shim,access_route,'a')
+
     delay_string = ', '.join(map(str, delay_list))
     print(delay_string)
-    save(board_shim,access_route,'a')
     powers=AlphaPowerFromFile(n_channel,sampling_rate,access_route)
     powers_string = ', '.join(map(str, powers))
     save_session_data(patient_id, interval_duration*len(delay_list), delay_string , n_channel, PAF,powers_string)
@@ -139,7 +140,7 @@ def save_REST(board_shim,total_duration,access_route='DATA.csv'):
     save(board_shim,access_route,mode='w')
 
 
-def REST(board_shim,total_duration=5,n_channel=4,access_route='DATA.csv',sampling_rate=250):
+def REST(board_shim,total_duration=60,n_channel=7,access_route='DATA.csv',sampling_rate=250):
     save_REST(board_shim,total_duration,access_route)
     data=get_data_from_file(access_route, channel_list=[n_channel], n_start=0, n_end=None)
     data=np.transpose(data)
@@ -218,8 +219,8 @@ def splice_signal(signal_markers):
         segments.append(signal[start_idx:end_idx].reshape(1, -1))
     
     # Add the last segment from the last marker to the end of the signal
-    # last_start_idx = marker_indices[-1]
-    # segments.append(signal[last_start_idx:].reshape(1, -1))
+    last_start_idx = marker_indices[-1]
+    segments.append(signal[last_start_idx:].reshape(1, -1))
     
     return segments
 

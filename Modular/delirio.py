@@ -36,7 +36,15 @@ import database as db
 from serial.tools import list_ports
 from signal_processing import Stimulation_Sequence, REST
 from PyQt6 import QtWidgets, QtCore
-
+import sys
+import sqlite3
+import logging
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLabel, QTextEdit, QMessageBox, QScrollArea
+from PyQt6.QtCore import Qt
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_pdf import PdfPages
+from database import get_sessions_by_patient_id
 
 
 
@@ -207,29 +215,119 @@ class PatientListWindow(QWidget):
         self.Vparametros.show()
 
 class PatientDataWindow(QWidget):
-    def __init__(self,patient_id):
+    def __init__(self, patient_id):
         super().__init__()
-        self.init_ui(patient_id)
-
-    def init_ui(self,patient_id):
-        self.plot_w = pg.PlotWidget()
-        self.plot_w.setBackground((18, 60, 790))
-        layout=QVBoxLayout()
-        filas=False
-        if filas:
-            print("sos un capo amigo")
-        else:
-            layout.addWidget(self.Title)
-            item_text='ERROR: NO SESSIONS FOUND'
-            self.Title.setText(item_text)
-        self.setLayout(layout)  # Set layout after adding plot_widget
-
-        # self.setWindowTitle(f"NeuroBack - Data Controls for {nombre}")
-        self.setGeometry(200, 200, 600, 400)
-        self.setStyleSheet("background-color: #1E3B4D; color: white;")
-
-class VentanaParametros(QWidget):
+        self.patient_id = patient_id
+        self.initUI()
     
+    def initUI(self):
+        self.setWindowTitle(f"Patient {self.patient_id} Sessions Viewer")
+        
+        layout = QVBoxLayout()
+        
+        self.scroll_area = QScrollArea()
+        self.scroll_widget = QWidget()
+        self.scroll_layout = QVBoxLayout(self.scroll_widget)
+        self.scroll_area.setWidget(self.scroll_widget)
+        self.scroll_area.setWidgetResizable(True)
+        
+        layout.addWidget(self.scroll_area)
+        
+        self.setLayout(layout)
+        
+        self.load_sessions()
+    
+    def load_sessions(self):
+        sessions = get_sessions_by_patient_id(self.patient_id)
+        if not sessions:
+            QMessageBox.warning(self, "No Sessions", "No sessions found for the given patient ID.")
+            return
+        
+        for session in sessions:
+            session_layout = QHBoxLayout()
+            
+            session_info = (
+                f"Session {session['session_num']}:\n"
+                f"  Duration: {session['duration']}\n"
+                f"  Phases Applied: {session['phases_applied']}\n"
+                f"  Record Channel: {session['record_channel']}\n"
+                f"  PAF: {session['paf']}\n"
+                f"  Powers: {session['powers']}\n"
+            )
+            
+            info_label = QLabel(session_info)
+            info_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+            
+            button_layout = QVBoxLayout()
+            plot_button = QPushButton("Plot")
+            plot_button.clicked.connect(lambda _, s=session: self.plot_session(s))
+            export_button = QPushButton("Export PDF")
+            export_button.clicked.connect(lambda _, s=session: self.export_pdf(s))
+            
+            button_layout.addWidget(plot_button)
+            button_layout.addWidget(export_button)
+            button_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+            
+            session_layout.addWidget(info_label)
+            session_layout.addLayout(button_layout)
+            session_layout.setAlignment(button_layout, Qt.AlignmentFlag.AlignTop)
+            
+            self.scroll_layout.addLayout(session_layout)
+    
+    def plot_session(self, session):
+        try:
+            phases = list(map(float, session['phases_applied'].split(',')))
+            powers = list(map(float, session['powers'].split(',')))
+            if len(phases) != len(powers):
+                QMessageBox.warning(self, "Data Error", "Phases and Powers length mismatch.")
+                return
+            # Sort the phases and powers together based on phases
+            sorted_data = sorted(zip(phases, powers))
+            phases, powers = zip(*sorted_data)
+        except ValueError:
+            QMessageBox.warning(self, "Data Error", "Invalid data format.")
+            return
+        
+        fig, ax = plt.subplots()
+        ax.plot(phases, powers, 'o-')
+        ax.set_title(f"Session {session['session_num']}: Powers vs Phases Applied")
+        ax.set_xlabel("Phases Applied")
+        ax.set_ylabel("Powers")
+        
+        fig.show()
+    
+    def export_pdf(self, session):
+        try:
+            phases = list(map(float, session['phases_applied'].split(',')))
+            powers = list(map(lambda x: f"{float(x):.2f}", session['powers'].split(',')))
+            if len(phases) != len(powers):
+                QMessageBox.warning(self, "Data Error", "Phases and Powers length mismatch.")
+                return
+            # Sort the phases and powers together based on phases
+            sorted_data = sorted(zip(phases, powers))
+            phases, powers = zip(*sorted_data)
+        except ValueError:
+            QMessageBox.warning(self, "Data Error", "Invalid data format.")
+            return
+        
+        formatted_powers = ", ".join(powers)
+        with PdfPages(f'session_{session["session_num"]}.pdf') as pdf:
+            fig, ax = plt.subplots()
+            ax.plot(phases, list(map(float, powers)), 'o-')
+            ax.set_title(f"Session {session['session_num']}:\n"
+                         f"Duration: {session['duration']}\n"
+                         f"Phases Applied: {session['phases_applied']}\n"
+                         f"Record Channel: {session['record_channel']}\n"
+                         f"PAF: {session['paf']}\n"
+                         f"Powers: {formatted_powers}")
+            ax.set_xlabel("Phases Applied")
+            ax.set_ylabel("Powers")
+            pdf.savefig(fig)
+            plt.close(fig)
+        
+        QMessageBox.information(self, "Export PDF", f"Session {session['session_num']} data and plot saved as PDF.")
+
+class VentanaParametros(QWidget): 
     def __init__(self):
         super().__init__()
         self.init_ui()

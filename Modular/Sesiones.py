@@ -160,12 +160,15 @@ class SessionViewer(QWidget):
             if len(phases) != len(powers):
                 QMessageBox.warning(self, "Data Error", "Phases and Powers length mismatch.")
                 return
+            # Sort the phases and powers together based on phases
+            sorted_data = sorted(zip(phases, powers))
+            phases, powers = zip(*sorted_data)
         except ValueError:
             QMessageBox.warning(self, "Data Error", "Invalid data format.")
             return
         
         fig, ax = plt.subplots()
-        ax.plot(phases, powers, 'o-')
+        ax.plot(phases, powers)
         ax.set_title(f"Session {session['session_num']}: Powers vs Phases Applied")
         ax.set_xlabel("Phases Applied")
         ax.set_ylabel("Powers")
@@ -179,6 +182,10 @@ class SessionViewer(QWidget):
             if len(phases) != len(powers):
                 QMessageBox.warning(self, "Data Error", "Phases and Powers length mismatch.")
                 return
+            
+            # Sort the phases and powers together based on phases
+            sorted_data = sorted(zip(phases, powers))
+            phases, powers = zip(*sorted_data)
         except ValueError:
             QMessageBox.warning(self, "Data Error", "Invalid data format.")
             return
@@ -186,7 +193,7 @@ class SessionViewer(QWidget):
         formatted_powers = ", ".join(powers)
         with PdfPages(f'session_{session["session_num"]}.pdf') as pdf:
             fig, ax = plt.subplots()
-            ax.plot(phases, list(map(float, powers)), 'o-')
+            ax.plot(phases, list(map(float, powers)))
             ax.set_title(f"Session {session['session_num']}:\n"
                          f"Duration: {session['duration']}\n"
                          f"Phases Applied: {session['phases_applied']}\n"
@@ -203,9 +210,9 @@ class SessionViewer(QWidget):
 
 if __name__ == "__main__":
     # Adding sample data for patient 8
-    # save_session_data(8, 5, "0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0, 180.0", "4", 10.1, "0.004082134411711152, 0.7695110938511753, 0.7372126561330138, -0.2989011746274714, -1.0659529839483846, -0.36743026151189945, 0.432655067679194, 0.881032970217394, 0.38308068590185934, -0.9612280491478534")
-    # save_session_data(8, 5, "0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0, 180.0", "4",10.5, "0.05773737809253615, 0.9307680317320296, 0.8498866196181067, -0.16976352945653467, -0.8225495676245911, -0.7037942096738107, 0.3854010203729452, 1.1087398074189327, 0.06657036152925744, -0.6592266947778167")
-    # save_session_data(8, 5, "0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0, 180.0", "4", 11.4, "-0.016864093921711898, 0.9648766860850753, 0.9132425540062626, -0.32291703012713285, -0.8635658833623019, -0.4076382794745105, 0.5820762952238858, 0.7808376231201525, 0.2280014667000983, -0.6436245942499622")
+    save_session_data(2, 5, "0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0, 180.0", "4", 10.1, "0.004082134411711152, 0.7695110938511753, 0.7372126561330138, -0.2989011746274714, -1.0659529839483846, -0.36743026151189945, 0.432655067679194, 0.881032970217394, 0.38308068590185934, -0.9612280491478534")
+    save_session_data(2, 5, "0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0, 180.0", "4",10.5, "0.05773737809253615, 0.9307680317320296, 0.8498866196181067, -0.16976352945653467, -0.8225495676245911, -0.7037942096738107, 0.3854010203729452, 1.1087398074189327, 0.06657036152925744, -0.6592266947778167")
+    save_session_data(2, 5, "0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0, 180.0", "4", 11.4, "-0.016864093921711898, 0.9648766860850753, 0.9132425540062626, -0.32291703012713285, -0.8635658833623019, -0.4076382794745105, 0.5820762952238858, 0.7808376231201525, 0.2280014667000983, -0.6436245942499622")
 
     app = QApplication(sys.argv)
     viewer = SessionViewer(1)

@@ -169,7 +169,7 @@ def main():
 
     params = BrainFlowInputParams()
     params.ip_port = 0
-    params.serial_port = ''
+    params.serial_port = '/dev/cu.usbserial-DM03H6KD'
     params.mac_address = ''
     params.other_info = ''
     params.serial_number = ''
@@ -177,7 +177,7 @@ def main():
     params.ip_protocol = 0
     params.timeout = 0
     params.file = ''
-    board_id = BoardIds.SYNTHETIC_BOARD
+    board_id = BoardIds.CYTON_BOARD
     streamer_params = ''
     stop_flag = threading.Event()
     duration = 30  # Set the duration in seconds after which the program should stop

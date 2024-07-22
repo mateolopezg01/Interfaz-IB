@@ -20,8 +20,8 @@ class Graph:
         self.win = pg.GraphicsLayoutWidget(show=True, title='BrainFlow Plot')
         self.win.resize(800, 600)
         self.win.setWindowTitle('BrainFlow Plot')
-        self.plotlist=[-1,5,2]
-        self.plotlist=self.exg_channels
+        self.plotlist=[1,6,7]
+        #self.plotlist=self.exg_channels
         self._init_timeseries()
 
         timer = QtCore.QTimer()
@@ -48,13 +48,6 @@ class Graph:
         data = self.board_shim.get_current_board_data(self.num_points)
         for count, channel in enumerate(self.plotlist):
             # plot timeseries
-            DataFilter.detrend(data[channel], DetrendOperations.CONSTANT.value)
-            DataFilter.perform_bandpass(data[channel], self.sampling_rate, 3.0, 45.0, 2,
-                                        FilterTypes.BUTTERWORTH.value, 0)
-            DataFilter.perform_bandstop(data[channel], self.sampling_rate, 48.0, 52.0, 2,
-                                        FilterTypes.BUTTERWORTH.value, 0)
-            DataFilter.perform_bandstop(data[channel], self.sampling_rate, 58.0, 62.0, 2,
-                                        FilterTypes.BUTTERWORTH.value, 0)
             self.curves[count].setData(data[channel].tolist())
 
         self.app.processEvents()
@@ -66,7 +59,7 @@ def main():
 
     params = BrainFlowInputParams()
     params.ip_port = 0
-    params.serial_port = ''
+    params.serial_port = '/dev/cu.usbserial-DM03H6KD'
     params.mac_address = ''
     params.other_info = ''
     params.serial_number = ''
@@ -74,7 +67,7 @@ def main():
     params.ip_protocol = 0
     params.timeout = 0
     params.file = ''
-    board_id=BoardIds.SYNTHETIC_BOARD
+    board_id=BoardIds.CYTON_BOARD
     streamer_params=''
 
     try:

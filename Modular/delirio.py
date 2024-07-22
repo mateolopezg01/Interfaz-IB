@@ -10,11 +10,34 @@ import pyqtgraph as pg
 import time
 import sqlite3
 # import pyaudio
+import random
 import time
 import serial
 import threading
 import database as db
 from serial.tools import list_ports
+
+from PyQt6.QtWidgets import  QComboBox, QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QListWidget, QListWidgetItem, QSizePolicy, QHBoxLayout, QProgressBar
+from PyQt6.QtCore import  Qt, pyqtSignal, pyqtSlot, QSize, QTimer
+from PyQt6.QtGui import QFont 
+from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
+from brainflow.data_filter import DataFilter
+import sys
+import numpy as np
+from scipy import signal
+import pyqtgraph as pg
+import time
+import sqlite3
+import time
+import serial
+import threading
+import random
+import database as db
+from serial.tools import list_ports
+from signal_processing import Stimulation_Sequence
+from PyQt6 import QtWidgets, QtCore
+
+
 
 class NeurobackApp(QWidget):
     def __init__(self): 
@@ -247,7 +270,7 @@ class VentanaParametros(QWidget):
         lista_puertos=list_ports.comports()
         self.puerto=QComboBox()
         self.fila_parametro(self.puerto,"Serial port:",[str(port)for port in lista_puertos])
-        lista_puertos.append("Synthethic")
+        lista_puertos.append("Synthetic")
         self.placa=QComboBox()
         self.fila_parametro(self.placa,"Board:",[str(port)for port in lista_puertos])
     
@@ -257,7 +280,7 @@ class VentanaParametros(QWidget):
         puerto = self.puerto.currentText()
         placa = self.placa.currentText()
 
-        self.session_window = SessionWindow(nphases,duration,puerto,placa)
+        self.session_window = SessionWindow(nphases, duration, puerto, placa)
         self.session_window.show()
         self.close()
 
@@ -279,12 +302,11 @@ class SessionWindow(QWidget):
         board= str(placa.split(' ',1)[0])
         self.n_channel=1
 
-        print('HOLA, nphases:', nfases, '\n', 'duration', duration, '\npuerto:', port, '\nplaca:', board)
         # Layout for the session window
         layout = QVBoxLayout(self)
 
         # Initialize BrainFlow and plotting
-        
+        print(str(nfases)+str( duracion)+str(port)+str(board))        
         self.init_brainflow(nfases, duracion,port,board)
 
         # Add plot widget to layout

@@ -39,9 +39,9 @@ def phase_detection(board_shim, stop_flag, b, a, serial_port, n_channel=0, delay
         data = board_shim.get_current_board_data(1) # cant de canales x cant de muestras ej: data.shape=(32,1) al hacer get_current_board(data)(5) con placa Synth
         if data.size > 0:
             if data[0][0] != anterior and len(data[0])!=0:
-                if data[0][0] != anterior+1 and data[0][0]!=0:#REVISAR el caso de ==0 si el anterior el 250
-                    print('OJO, salteó muestras')
-                    print(anterior,data[0][0])
+                if data[0][0] != anterior+1 and data[0][0]!=0:
+                    # print('OJO, salteó muestras')
+                    # print(anterior,data[0][0])
                 anterior=data[0][0]
                 x.append(data[n_channel][-1])
                 x=x[1:]

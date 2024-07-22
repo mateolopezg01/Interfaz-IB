@@ -9,7 +9,6 @@ from scipy import signal
 import pyqtgraph as pg
 import time
 import sqlite3
-import pyaudio
 import time
 import serial
 import threading

@@ -114,7 +114,7 @@ class SessionWindow(QWidget):
     def init_brainflow(self):
         Board = 'SYNTH'
         PuertoArduino = '/dev/cu.usbmodem1101'
-        n_channel=1
+        n_channel=0
         self.n_channel = n_channel
         total_duration = self.duration  # duration in seconds
         number_of_intervals = self.nphases

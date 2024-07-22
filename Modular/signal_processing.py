@@ -100,7 +100,7 @@ def stop_program_after_interval(interval, stop_flag):
     stop_flag.set()
 
 
-def Stimulation_Sequence(board_shim,serial_port, n_channel,total_duration,number_of_intervals,stop_flag,access_route='DATA.csv'):
+def Stimulation_Sequence(board_shim,serial_port, n_channel,total_duration,number_of_intervals,stop_flag,access_route='DATA.csv',PAF=10):
     delay_list = np.linspace(0, 200, num=number_of_intervals, endpoint=False).tolist()
     interval_duration = total_duration / number_of_intervals
     PAF=10

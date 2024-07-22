@@ -33,11 +33,8 @@ def get_data_from_file(access_route='DATA.csv', channel_list=None, n_start=0, n_
         return None
     
 
-channel_data=(get_data_from_file(access_route='DATA.csv', channel_list=[2,-1], n_start=0, n_end=None))
 
-# plt.plot(channel_data[-1])
-# plt.show()
-print(channel_data)
+
 
 def splice_signal(signal_markers):
     """
@@ -74,23 +71,26 @@ def splice_signal(signal_markers):
     
     return segments
 
-segments=splice_signal(channel_data)
 
-POWERS=[]
-for segment in segments:
-    print(segment.shape)
-    segment=np.transpose(segment)
-    length=len(segment)
-    fft_result = np.fft.fft(segment,axis=0)
-    frequencies = np.fft.fftfreq(length, 1/sampling_rate)
-    # # Take the magnitude of the FFT
-    power_spectrum = np.abs(fft_result) ** 2
-    
-    # Filter the frequencies to the desired range
-    filtered_indices = np.where((frequencies >= 8) & (frequencies <= 12))[0]
-    
-    # Calculate the power in the specified frequency band
-    power_in_band = np.sum(power_spectrum[filtered_indices])
-    POWERS.append(power_in_band)
-    POWERS_np=np.array(POWERS)
-print(POWERS_np/np.max(POWERS_np))
+def AlphaPowerFromFile(n_channel,access_route='DATA.csv'):
+    channel_data=(get_data_from_file(access_route, channel_list=[n_channel,-1], n_start=0, n_end=None))
+    segments=splice_signal(channel_data)
+
+    POWERS=[]
+    for segment in segments:
+        segment=np.transpose(segment)
+        length=len(segment)
+        fft_result = np.fft.fft(segment,axis=0)
+        frequencies = np.fft.fftfreq(length, 1/sampling_rate)
+        # # Take the magnitude of the FFT
+        power_spectrum = np.abs(fft_result) ** 2
+        
+        # Filter the frequencies to the desired range
+        filtered_indices = np.where((frequencies >= 8) & (frequencies <= 12))[0]
+        # Calculate the power in the specified frequency band
+        power_in_band = np.sum(power_spectrum[filtered_indices])
+        POWERS.append(power_in_band)
+        POWERS_np=np.array(POWERS)
+    return (POWERS_np/np.max(POWERS_np))
+
+print(AlphaPowerFromFile(2))

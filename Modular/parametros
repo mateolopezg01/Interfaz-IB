@@ -13,10 +13,12 @@ import pyaudio
 import time
 import serial
 import threading
+import random
 import database as db
 from serial.tools import list_ports
 from signal_processing import Stimulation_Sequence
 from PyQt6 import QtWidgets, QtCore
+
 
 class VentanaParametros(QWidget):
     def __init__(self):
@@ -90,16 +92,16 @@ class SessionWindow(QWidget):
         # Update to reflect passed parameters
         nfases= int(nphases)
         duracion = int(duration) * 60  # Convert minutes to seconds
-        port= puerto.split(' ',1)[0]
-        board= placa.split(' ',1)[0]
+        port= str(puerto.split(' ',1)[0])
+        board= str(placa.split(' ',1)[0])
         self.n_channel=1
 
-        print('nphases:', nphases, '\n', 'duration', duration, '\npuerto:', port, '\nplaca:', placa)
-
+        print('HOLA, nphases:', nfases, '\n', 'duration', duration, '\npuerto:', port, '\nplaca:', board)
         # Layout for the session window
         layout = QVBoxLayout(self)
 
         # Initialize BrainFlow and plotting
+        
         self.init_brainflow(nfases, duracion,port,board)
 
         # Add plot widget to layout
@@ -117,8 +119,11 @@ class SessionWindow(QWidget):
         self.parametros_brainflow(Board)
         # Initialize your serial port object here
         self.serial_port = serial.Serial(PuertoArduino, 2000000)
+        delay_list = np.linspace(0, 200, num=number_of_intervals, endpoint=False).tolist()
+        random.shuffle(delay_list)
+        interval_duration = total_duration / number_of_intervals
         # Start the Stimulation_Sequence in a separate thread
-        stimulation_thread = threading.Thread(target=Stimulation_Sequence, args=(self.board_shim, self.serial_port, n_channel, total_duration, number_of_intervals, self.stop_flag))
+        stimulation_thread = threading.Thread(target=Stimulation_Sequence, args=(self.board_shim, self.serial_port, n_channel, delay_list,interval_duration, self.stop_flag))
         stimulation_thread.start()
 
         # Board info

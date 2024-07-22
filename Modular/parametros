@@ -92,6 +92,7 @@ class SessionWindow(QWidget):
         duracion = int(duration) * 60  # Convert minutes to seconds
         port= puerto.split(' ',1)[0]
         board= placa.split(' ',1)[0]
+        self.n_channel=1
 
         print('nphases:', nphases, '\n', 'duration', duration, '\npuerto:', port, '\nplaca:', placa)
 
